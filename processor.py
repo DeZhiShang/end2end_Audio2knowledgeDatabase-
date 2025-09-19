@@ -48,8 +48,13 @@ class AudioProcessor:
             asr_exists = self.asr_processor.check_asr_exists(asr_output_file)
 
             if not force_overwrite and rttm_exists and segmentation_exists and asr_exists:
-                wav_files = [f for f in os.listdir(output_directory) if f.endswith('.wav')] if os.path.exists(output_directory) else []
-                print(f"  ⏭️  完全跳过：所有步骤均已完成，发现{len(wav_files)}个片段，ASR结果: {asr_output_file}")
+                # 更严谨的检查：确保音频切分目录存在且包含文件
+                if os.path.exists(output_directory):
+                    wav_files = [f for f in os.listdir(output_directory) if f.endswith('.wav')]
+                    file_count_msg = f"发现{len(wav_files)}个片段"
+                else:
+                    file_count_msg = "音频目录不存在但ASR结果存在"
+                print(f"  ⏭️  完全跳过：所有步骤均已完成，{file_count_msg}，ASR结果: {asr_output_file}")
                 return "skipped"
 
             # 1. 检查并执行说话人分离

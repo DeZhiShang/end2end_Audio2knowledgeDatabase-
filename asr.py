@@ -37,7 +37,8 @@ class ASRProcessor:
                 task=Tasks.auto_speech_recognition,
                 model=self.model_path,
                 model_revision="master",
-                device="cuda:0"
+                device="cuda:0",
+                languege="zh"
             )
             print("✅ SenseVoice模型初始化成功")
         except Exception as e:
@@ -60,6 +61,24 @@ class ASRProcessor:
             return match.group()
         return "UNKNOWN_SPEAKER"
 
+    def clean_sensevoice_text(self, raw_text):
+        """
+        清理SenseVoice输出的文本，去除标记符号
+
+        Args:
+            raw_text: 原始文本，如 '<|zh|><|NEUTRAL|><|Speech|><|woitn|>喂你好'
+
+        Returns:
+            str: 清理后的纯文本，如 '喂你好'
+        """
+        if not raw_text:
+            return ""
+
+        # 使用正则表达式去除所有 <|...|> 格式的标记
+        import re
+        cleaned_text = re.sub(r'<\|[^|]*\|>', '', raw_text)
+        return cleaned_text.strip()
+
     def process_single_audio(self, wav_file):
         """
         处理单个音频文件进行ASR识别
@@ -78,11 +97,21 @@ class ASRProcessor:
             filename = os.path.basename(wav_file)
             speaker_id = self.extract_speaker_from_filename(filename)
 
-            # 提取识别文本（SenseVoice返回格式可能需要调整）
-            if isinstance(rec_result, dict) and 'text' in rec_result:
-                text = rec_result['text']
+            # 提取识别文本 - 处理SenseVoice的实际返回格式
+            text = ""
+            if isinstance(rec_result, list) and len(rec_result) > 0:
+                # SenseVoice返回格式: [{'key': '...', 'text': '...'}]
+                first_result = rec_result[0]
+                if isinstance(first_result, dict) and 'text' in first_result:
+                    raw_text = first_result['text']
+                    text = self.clean_sensevoice_text(raw_text)
+                else:
+                    text = str(first_result)
+            elif isinstance(rec_result, dict) and 'text' in rec_result:
+                raw_text = rec_result['text']
+                text = self.clean_sensevoice_text(raw_text)
             elif isinstance(rec_result, str):
-                text = rec_result
+                text = self.clean_sensevoice_text(rec_result)
             else:
                 text = str(rec_result)
 

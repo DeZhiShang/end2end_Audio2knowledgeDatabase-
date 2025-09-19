@@ -2,6 +2,7 @@
 wavs/
 mp3s/
 rttms/
+docs/
 
 # 模型文件
 senseVoice-small/
