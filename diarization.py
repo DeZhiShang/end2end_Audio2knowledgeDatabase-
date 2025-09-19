@@ -66,5 +66,43 @@ class SpeakerDiarization:
             diarization: 分离结果对象
             rttm_file: RTTM文件路径
         """
+        import os
+        # 确保输出目录存在
+        os.makedirs(os.path.dirname(rttm_file), exist_ok=True)
+
         with open(rttm_file, "w") as rttm:
             diarization.write_rttm(rttm)
+
+    def check_rttm_exists(self, rttm_file):
+        """
+        检查RTTM文件是否已存在且有效
+
+        Args:
+            rttm_file: RTTM文件路径
+
+        Returns:
+            bool: 文件是否存在且有效
+        """
+        import os
+        if not os.path.exists(rttm_file):
+            return False
+
+        # 检查文件是否为空
+        if os.path.getsize(rttm_file) == 0:
+            return False
+
+        # 检查文件内容格式是否正确
+        try:
+            with open(rttm_file, 'r') as f:
+                lines = f.readlines()
+                if len(lines) == 0:
+                    return False
+
+                # 检查第一行格式是否正确
+                first_line = lines[0].strip().split()
+                if len(first_line) < 8 or first_line[0] != "SPEAKER":
+                    return False
+
+            return True
+        except Exception:
+            return False

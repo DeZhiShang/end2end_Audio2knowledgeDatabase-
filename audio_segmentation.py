@@ -19,7 +19,25 @@ class AudioSegmentation:
         """初始化音频切分器"""
         pass
 
-    def parse_rttm_and_segment(self, rttm_file, wav_file, output_dir):
+    def check_segmentation_exists(self, output_dir):
+        """
+        检查切分结果是否已存在
+
+        Args:
+            output_dir: 输出目录路径
+
+        Returns:
+            bool: 切分结果是否已存在
+        """
+        import os
+        if not os.path.exists(output_dir):
+            return False
+
+        # 检查目录下是否有wav文件
+        wav_files = [f for f in os.listdir(output_dir) if f.endswith('.wav')]
+        return len(wav_files) > 0
+
+    def parse_rttm_and_segment(self, rttm_file, wav_file, output_dir, force_overwrite=False):
         """
         解析RTTM文件并根据时间戳切分音频
 
@@ -27,7 +45,14 @@ class AudioSegmentation:
             rttm_file: RTTM文件路径
             wav_file: 原始WAV音频文件路径
             output_dir: 输出目录路径
+            force_overwrite: 是否强制覆盖已存在的结果
         """
+        # 检查是否已经处理过
+        if not force_overwrite and self.check_segmentation_exists(output_dir):
+            import os
+            wav_files = [f for f in os.listdir(output_dir) if f.endswith('.wav')]
+            print(f"  ⏭️  跳过已切分的音频，发现{len(wav_files)}个片段: {output_dir}")
+            return True
         # 加载原始音频
         waveform, sample_rate = torchaudio.load(wav_file)
 
@@ -109,3 +134,4 @@ class AudioSegmentation:
                 )
 
         print(f"成功切分 {segment_count} 个音频片段")
+        return True

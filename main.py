@@ -24,13 +24,13 @@ from processor import AudioProcessor
 def main():
     """主程序入口"""
     print("🎵 端到端音频处理系统")
-    print("流程: wav音频 → 说话人分离 → 切分子音频")
+    print("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频")
     print("=" * 50)
 
     # 创建音频处理器
     processor = AudioProcessor()
 
-    # 执行批量处理
+    # 执行批量处理（包含MP3转WAV预处理）
     processor.process_batch()
 
 
