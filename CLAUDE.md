@@ -60,6 +60,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - PyTorch (CUDA支持)
 - CUDA兼容的GPU
 - Hugging Face访问token (用于pyannote模型)
+- 阿里云API密钥 (用于后续LLM清洗功能)
+
+### 环境变量配置
+创建 `.env` 文件并配置以下环境变量：
+```bash
+# Hugging Face 访问令牌 (用于pyannote模型)
+export HUGGINGFACE_TOKEN=your_huggingface_token_here
+
+# 阿里云API配置 (用于后续LLM清洗功能)
+export DASHSCOPE_API_KEY=your_dashscope_api_key_here
+export DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+参考 `.env.example` 文件获取完整的配置模板。
 
 ### 关键依赖
 ```python
@@ -101,7 +115,8 @@ RTTM文件格式: `SPEAKER waveform 1 起始时间 持续时间 <NA> <NA> 说话
 - ⏳ 批量处理和并发
 
 ### 注意事项
-- 模型使用Hugging Face token: `UNKNOWN`
+- 模型使用Hugging Face token，需要通过环境变量 `HUGGINGFACE_TOKEN` 配置
 - pyannote模型自动加载到GPU (cuda:0)
 - SenseVoice模型支持中文、英文、粤语、日语、韩语识别
 - 所有处理过程保持音频质量，避免重采样损失
+- 阿里云API配置用于后续LLM文本清洗功能

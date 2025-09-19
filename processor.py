@@ -9,6 +9,7 @@ from tqdm import tqdm
 from diarization import SpeakerDiarization
 from audio_segmentation import AudioSegmentation
 from audio_converter import AudioConverter
+from asr import ASRProcessor
 
 
 class AudioProcessor:
@@ -19,10 +20,11 @@ class AudioProcessor:
         self.converter = AudioConverter()
         self.diarizer = SpeakerDiarization()
         self.segmenter = AudioSegmentation()
+        self.asr_processor = ASRProcessor()
 
     def process_single_file(self, wav_file, force_overwrite=False):
         """
-        端到端处理单个音频文件：说话人分离 → 音频切分
+        端到端处理单个音频文件：说话人分离 → 音频切分 → ASR识别
 
         Args:
             wav_file: 音频文件路径
@@ -36,16 +38,18 @@ class AudioProcessor:
             filename = os.path.splitext(os.path.basename(wav_file))[0]
             print(f"\n🎵 开始处理: {wav_file}")
 
-            # 检查是否完全跳过（两个步骤都已完成）
+            # 检查是否完全跳过（三个步骤都已完成）
             rttm_file = f"rttms/{filename}.rttm"
             output_directory = f"wavs/{filename}"
+            asr_output_file = f"docs/{filename}.md"
 
             rttm_exists = self.diarizer.check_rttm_exists(rttm_file)
             segmentation_exists = self.segmenter.check_segmentation_exists(output_directory)
+            asr_exists = self.asr_processor.check_asr_exists(asr_output_file)
 
-            if not force_overwrite and rttm_exists and segmentation_exists:
-                wav_files = [f for f in os.listdir(output_directory) if f.endswith('.wav')]
-                print(f"  ⏭️  完全跳过：RTTM和音频切分均已存在，发现{len(wav_files)}个片段")
+            if not force_overwrite and rttm_exists and segmentation_exists and asr_exists:
+                wav_files = [f for f in os.listdir(output_directory) if f.endswith('.wav')] if os.path.exists(output_directory) else []
+                print(f"  ⏭️  完全跳过：所有步骤均已完成，发现{len(wav_files)}个片段，ASR结果: {asr_output_file}")
                 return "skipped"
 
             # 1. 检查并执行说话人分离
@@ -65,7 +69,17 @@ class AudioProcessor:
                 print("  ✂️  开始音频切分...")
                 self.segmenter.parse_rttm_and_segment(rttm_file, wav_file, output_directory, force_overwrite)
 
-            print(f"  ✅ {filename} 处理完成！")
+            # 3. 检查并执行ASR识别
+            if not force_overwrite and asr_exists:
+                print(f"  ⏭️  跳过已存在的ASR识别结果: {asr_output_file}")
+            else:
+                print("  🎙️  开始ASR语音识别...")
+                # 确保docs目录存在
+                os.makedirs("docs", exist_ok=True)
+                asr_result = self.asr_processor.process_audio_directory(output_directory, asr_output_file, force_overwrite)
+                print(f"  📝 ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个")
+
+            print(f"  ✅ {filename} 完整处理完成！")
             return "success"
 
         except Exception as e:

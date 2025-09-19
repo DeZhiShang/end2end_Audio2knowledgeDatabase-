@@ -29,7 +29,6 @@ class AudioSegmentation:
         Returns:
             bool: 切分结果是否已存在
         """
-        import os
         if not os.path.exists(output_dir):
             return False
 
@@ -49,7 +48,6 @@ class AudioSegmentation:
         """
         # 检查是否已经处理过
         if not force_overwrite and self.check_segmentation_exists(output_dir):
-            import os
             wav_files = [f for f in os.listdir(output_dir) if f.endswith('.wav')]
             print(f"  ⏭️  跳过已切分的音频，发现{len(wav_files)}个片段: {output_dir}")
             return True

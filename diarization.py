@@ -4,8 +4,17 @@
 """
 
 import warnings
+import os
 # 过滤相关警告
 warnings.filterwarnings("ignore", category=UserWarning)
+
+# 自动加载.env文件中的环境变量
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # 如果没有安装python-dotenv，忽略错误
+    pass
 
 from pyannote.audio import Pipeline
 import torch
@@ -17,16 +26,22 @@ class SpeakerDiarization:
     """说话人分离处理器"""
 
     def __init__(self, model_name="pyannote/speaker-diarization-3.1",
-                 auth_token="UNKNOWN",
+                 auth_token=None,
                  device="cuda:0"):
         """
         初始化说话人分离模型
 
         Args:
             model_name: 模型名称
-            auth_token: HuggingFace访问令牌
+            auth_token: HuggingFace访问令牌，如果为None则从环境变量HUGGINGFACE_TOKEN获取
             device: 计算设备
         """
+        # 如果未提供token，从环境变量获取
+        if auth_token is None:
+            auth_token = os.getenv('HUGGINGFACE_TOKEN')
+            if auth_token is None:
+                raise ValueError("请设置环境变量 HUGGINGFACE_TOKEN 或在初始化时提供 auth_token 参数")
+
         self.pipeline = Pipeline.from_pretrained(
             model_name,
             use_auth_token=auth_token
