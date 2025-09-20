@@ -24,8 +24,8 @@ from processor import AudioProcessor
 def main():
     """主程序入口"""
     print("🎵 端到端音频处理系统")
-    print("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频 → ASR语音识别 → 知识库语料")
-    print("=" * 60)
+    print("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频 → ASR语音识别 → Gleaning多轮清洗 → 高质量知识库语料")
+    print("=" * 90)
 
     # 创建音频处理器
     processor = AudioProcessor()

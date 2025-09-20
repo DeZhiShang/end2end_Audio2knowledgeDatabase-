@@ -21,3 +21,7 @@ tqdm>=4.64.0
 
 # 文件操作
 glob2>=0.7
+
+# LLM数据清洗
+openai>=1.0.0
+python-dotenv>=1.0.0
