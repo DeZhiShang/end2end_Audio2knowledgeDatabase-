@@ -6,6 +6,7 @@ docs/
 
 # 模型文件
 senseVoice-small/
+paraformer/
 *.bin
 *.pt
 *.pth
