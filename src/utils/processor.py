@@ -6,18 +6,21 @@
 import os
 import glob
 from tqdm import tqdm
+from typing import Dict, Any
 from src.core.diarization import SpeakerDiarization
 from src.core.audio_segmentation import AudioSegmentation
 from src.utils.audio_converter import AudioConverter
 from src.core.asr import ASRProcessor
 from src.core.llm_cleaner import LLMDataCleaner
+from src.core.async_llm_processor import get_async_llm_processor, shutdown_async_llm_processor
 from src.utils.logger import get_logger
+import atexit
 
 
 class AudioProcessor:
     """音频处理器：管理端到端的音频处理流程"""
 
-    def __init__(self):
+    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4):
         """初始化处理器"""
         self.logger = get_logger(__name__)
         self.converter = AudioConverter()
@@ -26,10 +29,28 @@ class AudioProcessor:
         self.asr_processor = ASRProcessor()
         self.llm_cleaner = None  # 延迟初始化LLM清洗器
 
+        # 异步LLM处理配置
+        self.enable_async_llm = enable_async_llm
+        self.async_llm_processor = None
+        self.submitted_llm_tasks = {}  # 跟踪提交的异步LLM任务
+
         # Gleaning机制配置
         self.enable_gleaning = True  # 默认启用gleaning多轮清洗
         self.max_gleaning_rounds = 3  # 最大清洗轮数
         # 注意：质量阈值由LLMDataCleaner管理，避免重复配置
+
+        # 初始化异步LLM处理器
+        if self.enable_async_llm:
+            self.async_llm_processor = get_async_llm_processor()
+            self.async_llm_processor.start()
+            # 注册清理函数
+            atexit.register(self._cleanup_async_processor)
+
+    def _cleanup_async_processor(self):
+        """清理异步处理器"""
+        if self.async_llm_processor:
+            self.logger.info("正在关闭异步LLM处理器...")
+            self.async_llm_processor.stop(wait_for_completion=True)
 
     def _initialize_llm_cleaner(self):
         """延迟初始化LLM清洗器"""
@@ -119,42 +140,56 @@ class AudioProcessor:
                 self.logger.info(f"ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个",
                                extra_data={'success_count': asr_result['success'], 'error_count': asr_result['error']})
 
-            # 4. 检查并执行LLM数据清洗（直接覆盖ASR文件）
+            # 4. 执行LLM数据清洗（支持异步模式）
             if enable_llm_cleaning:
-                self.logger.info("开始数据清洗并覆盖ASR结果...")
-                self._initialize_llm_cleaner()
-                if self.llm_cleaner and self.llm_cleaner is not False:
-                    if enable_gleaning:
-                        self.logger.info("使用Gleaning多轮清洗...")
-                        clean_result = self.llm_cleaner.clean_markdown_file(
-                            asr_output_file,
-                            asr_output_file,  # 直接覆盖原文件
-                            enable_gleaning=True,
-                            max_rounds=self.max_gleaning_rounds
-                            # 使用LLMDataCleaner的默认质量阈值
-                        )
-                        if clean_result["success"]:
-                            self.logger.info(f"Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}",
-                                           extra_data={'rounds': clean_result['rounds'], 'tokens': clean_result['total_tokens'], 'quality_score': clean_result['final_quality_score']})
-                        else:
-                            self.logger.error(f"Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
-                    else:
-                        self.logger.info("使用标准清洗...")
-                        clean_result = self.llm_cleaner.clean_markdown_file(
-                            asr_output_file,
-                            asr_output_file,  # 直接覆盖原文件
-                            enable_gleaning=False
-                        )
-                        if clean_result["success"]:
-                            if 'total_tokens' in clean_result:
-                                self.logger.info(f"标准清洗完成: {clean_result['total_tokens']} tokens",
-                                               extra_data={'tokens': clean_result['total_tokens']})
-                            else:
-                                self.logger.info("标准清洗完成")
-                        else:
-                            self.logger.error(f"标准清洗失败: {clean_result.get('error', '未知错误')}")
+                if self.enable_async_llm and self.async_llm_processor:
+                    # 异步模式：提交任务到队列，不等待完成
+                    self.logger.info("提交异步LLM清洗任务...")
+                    task_id = self.async_llm_processor.submit_task(
+                        asr_file=asr_output_file,
+                        enable_gleaning=enable_gleaning,
+                        max_rounds=self.max_gleaning_rounds,
+                        callback=self._llm_task_callback
+                    )
+                    self.submitted_llm_tasks[filename] = task_id
+                    method_desc = "Gleaning清洗" if enable_gleaning else "标准清洗"
+                    self.logger.info(f"异步{method_desc}任务已提交: {task_id}")
                 else:
-                    self.logger.warning("LLM清洗器不可用，跳过数据清洗")
+                    # 同步模式：保持原有逻辑
+                    self.logger.info("开始同步数据清洗并覆盖ASR结果...")
+                    self._initialize_llm_cleaner()
+                    if self.llm_cleaner and self.llm_cleaner is not False:
+                        if enable_gleaning:
+                            self.logger.info("使用Gleaning多轮清洗...")
+                            clean_result = self.llm_cleaner.clean_markdown_file(
+                                asr_output_file,
+                                asr_output_file,  # 直接覆盖原文件
+                                enable_gleaning=True,
+                                max_rounds=self.max_gleaning_rounds
+                                # 使用LLMDataCleaner的默认质量阈值
+                            )
+                            if clean_result["success"]:
+                                self.logger.info(f"Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}",
+                                               extra_data={'rounds': clean_result['rounds'], 'tokens': clean_result['total_tokens'], 'quality_score': clean_result['final_quality_score']})
+                            else:
+                                self.logger.error(f"Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
+                        else:
+                            self.logger.info("使用标准清洗...")
+                            clean_result = self.llm_cleaner.clean_markdown_file(
+                                asr_output_file,
+                                asr_output_file,  # 直接覆盖原文件
+                                enable_gleaning=False
+                            )
+                            if clean_result["success"]:
+                                if 'total_tokens' in clean_result:
+                                    self.logger.info(f"标准清洗完成: {clean_result['total_tokens']} tokens",
+                                                   extra_data={'tokens': clean_result['total_tokens']})
+                                else:
+                                    self.logger.info("标准清洗完成")
+                            else:
+                                self.logger.error(f"标准清洗失败: {clean_result.get('error', '未知错误')}")
+                    else:
+                        self.logger.warning("LLM清洗器不可用，跳过数据清洗")
 
             self.logger.info(f"{filename} 完整处理完成！")
             return "success"
@@ -259,4 +294,82 @@ class AudioProcessor:
         self.logger.info(f"处理结果统计 - 成功: {success_count}个, 跳过: {skipped_count}个, 失败: {error_count}个",
                         extra_data={'success': success_count, 'skipped': skipped_count, 'error': error_count})
 
-        return {"success": success_count, "error": error_count, "skipped": skipped_count}
+        # 如果启用了异步LLM，显示异步任务状态
+        if self.enable_async_llm and self.submitted_llm_tasks:
+            self._report_async_llm_status()
+
+        return {
+            "success": success_count,
+            "error": error_count,
+            "skipped": skipped_count,
+            "async_llm_tasks": len(self.submitted_llm_tasks) if self.enable_async_llm else 0
+        }
+
+    def _llm_task_callback(self, result: Dict[str, Any]):
+        """LLM任务完成回调函数"""
+        task_id = result.get('task_id', 'unknown')
+        if result.get('success'):
+            processing_time = result.get('processing_time', 0)
+            if 'total_tokens' in result:
+                self.logger.info(f"异步LLM任务完成: {task_id} (耗时: {processing_time:.1f}s, {result['total_tokens']} tokens)")
+            else:
+                self.logger.info(f"异步LLM任务完成: {task_id} (耗时: {processing_time:.1f}s)")
+        else:
+            error = result.get('error', '未知错误')
+            self.logger.error(f"异步LLM任务失败: {task_id} - {error}")
+
+    def _report_async_llm_status(self):
+        """报告异步LLM任务状态"""
+        if not (self.enable_async_llm and self.async_llm_processor):
+            return
+
+        stats = self.async_llm_processor.get_statistics()
+        pending_tasks = []
+        completed_tasks = []
+        failed_tasks = []
+
+        for filename, task_id in self.submitted_llm_tasks.items():
+            status = self.async_llm_processor.get_task_status(task_id)
+            if status['status'] == 'completed':
+                completed_tasks.append(filename)
+            elif status['status'] == 'failed':
+                failed_tasks.append(filename)
+            else:
+                pending_tasks.append(filename)
+
+        self.logger.info(f"异步LLM任务状态 - 队列中: {len(pending_tasks)}个, 已完成: {len(completed_tasks)}个, 失败: {len(failed_tasks)}个")
+
+        if pending_tasks:
+            self.logger.info(f"仍在处理: {', '.join([os.path.basename(f) for f in pending_tasks[:5]])}" +
+                           (f" 等{len(pending_tasks)}个文件" if len(pending_tasks) > 5 else ""))
+
+    def wait_for_async_llm_tasks(self, timeout: float = None) -> Dict[str, Any]:
+        """
+        等待所有异步LLM任务完成
+
+        Args:
+            timeout: 超时时间（秒）
+
+        Returns:
+            Dict[str, Any]: 等待结果
+        """
+        if not (self.enable_async_llm and self.async_llm_processor):
+            return {"status": "not_enabled"}
+
+        if not self.submitted_llm_tasks:
+            return {"status": "no_tasks"}
+
+        self.logger.info(f"等待 {len(self.submitted_llm_tasks)} 个异步LLM任务完成...")
+
+        result = self.async_llm_processor.wait_for_all_tasks(timeout=timeout)
+
+        # 更新任务状态
+        self._report_async_llm_status()
+
+        return result
+
+    def shutdown(self):
+        """关闭处理器，清理资源"""
+        if self.enable_async_llm and self.async_llm_processor:
+            self.logger.info("关闭异步LLM处理器...")
+            self.async_llm_processor.stop(wait_for_completion=True)
