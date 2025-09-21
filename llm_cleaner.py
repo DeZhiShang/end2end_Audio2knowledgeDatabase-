@@ -46,7 +46,7 @@ class LLMDataCleaner:
 
         # Gleaning机制配置
         self.max_gleaning_rounds = 3  # 最大清洗轮数
-        self.quality_threshold = 0.8  # 质量阈值(0-1)
+        self.quality_threshold = 0.90  # 质量阈值(0-1)
         self.min_improvement_threshold = 0.05  # 最小改进阈值
 
     def get_cleaning_prompt(self) -> str:

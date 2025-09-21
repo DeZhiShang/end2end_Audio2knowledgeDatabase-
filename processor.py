@@ -27,7 +27,7 @@ class AudioProcessor:
         # Gleaning机制配置
         self.enable_gleaning = True  # 默认启用gleaning多轮清洗
         self.max_gleaning_rounds = 3  # 最大清洗轮数
-        self.quality_threshold = 0.8  # 质量阈值(0-1)
+        # 注意：质量阈值由LLMDataCleaner管理，避免重复配置
 
     def _initialize_llm_cleaner(self):
         """延迟初始化LLM清洗器"""
@@ -134,8 +134,8 @@ class AudioProcessor:
                             asr_output_file,
                             asr_output_file,  # 直接覆盖原文件
                             enable_gleaning=True,
-                            max_rounds=self.max_gleaning_rounds,
-                            quality_threshold=self.quality_threshold
+                            max_rounds=self.max_gleaning_rounds
+                            # 使用LLMDataCleaner的默认质量阈值
                         )
                         if clean_result["success"]:
                             print(f"  ✨ Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}")

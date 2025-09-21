@@ -148,14 +148,16 @@ processor.process_single_file("wavs/audio1.wav")
 ### 系统配置
 - **默认模式**: 自动启用Gleaning多轮清洗
 - **输出位置**: 所有清洗结果直接覆盖`docs/`目录中的原始ASR文件
-- **质量控制**: 默认3轮清洗，质量阈值0.8，自动停止机制
+- **质量控制**: 默认3轮清洗，质量阈值0.9，自动停止机制
 
 ### 高级配置（可选）
 ```python
 # 修改默认参数
 processor.max_gleaning_rounds = 4      # 最大清洗轮数
-processor.quality_threshold = 0.85     # 质量阈值
 processor.enable_gleaning = True       # 默认启用
+
+# 质量阈值在LLMDataCleaner中配置(默认0.9)
+# 如需修改，请编辑llm_cleaner.py:49行
 
 # 强制重新处理
 processor.process_batch(force_overwrite=True)
