@@ -11,6 +11,7 @@ from src.core.audio_segmentation import AudioSegmentation
 from src.utils.audio_converter import AudioConverter
 from src.core.asr import ASRProcessor
 from src.core.llm_cleaner import LLMDataCleaner
+from src.utils.logger import get_logger
 
 
 class AudioProcessor:
@@ -18,6 +19,7 @@ class AudioProcessor:
 
     def __init__(self):
         """初始化处理器"""
+        self.logger = get_logger(__name__)
         self.converter = AudioConverter()
         self.diarizer = SpeakerDiarization()
         self.segmenter = AudioSegmentation()
@@ -34,9 +36,9 @@ class AudioProcessor:
         if self.llm_cleaner is None:
             try:
                 self.llm_cleaner = LLMDataCleaner()
-                print("🤖 LLM清洗器初始化成功")
+                self.logger.info("LLM清洗器初始化成功")
             except Exception as e:
-                print(f"⚠️  LLM清洗器初始化失败: {str(e)}")
+                self.logger.warning(f"LLM清洗器初始化失败: {str(e)}")
                 self.llm_cleaner = False  # 标记为失败，避免重复尝试
 
     def process_single_file(self, wav_file, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
@@ -58,7 +60,7 @@ class AudioProcessor:
         try:
             # 提取文件名（不含扩展名）
             filename = os.path.splitext(os.path.basename(wav_file))[0]
-            print(f"\n🎵 开始处理: {wav_file}")
+            self.logger.info(f"开始处理音频文件: {wav_file}")
 
             # 检查是否完全跳过（四个步骤都已完成）
             rttm_file = f"data/processed/rttms/{filename}.rttm"
@@ -86,43 +88,44 @@ class AudioProcessor:
                     file_count_msg = "音频目录不存在但ASR结果存在"
 
                 method_desc = "Gleaning清洗" if enable_llm_cleaning and enable_gleaning else ("标准清洗" if enable_llm_cleaning else "ASR识别")
-                print(f"  ⏭️  完全跳过：所有步骤均已完成，{file_count_msg}，最终结果: {final_output_file} ({method_desc})")
+                self.logger.info(f"完全跳过：所有步骤均已完成，{file_count_msg}，最终结果: {final_output_file} ({method_desc})")
                 return "skipped"
 
             # 1. 检查并执行说话人分离
             if not force_overwrite and rttm_exists:
-                print(f"  ⏭️  跳过已存在的说话人分离结果: {rttm_file}")
+                self.logger.info(f"跳过已存在的说话人分离结果: {rttm_file}")
             else:
-                print("  🔍 执行说话人分离...")
+                self.logger.info("执行说话人分离...")
                 diarization = self.diarizer.process(wav_file)
                 self.diarizer.save_rttm(diarization, rttm_file)
-                print(f"  💾 RTTM文件保存至: {rttm_file}")
+                self.logger.info(f"RTTM文件保存至: {rttm_file}")
 
             # 2. 检查并执行音频切分
             if not force_overwrite and segmentation_exists:
                 wav_files = [f for f in os.listdir(output_directory) if f.endswith('.wav')]
-                print(f"  ⏭️  跳过已存在的音频切分结果，发现{len(wav_files)}个片段")
+                self.logger.info(f"跳过已存在的音频切分结果，发现{len(wav_files)}个片段")
             else:
-                print("  ✂️  开始音频切分...")
+                self.logger.info("开始音频切分...")
                 self.segmenter.parse_rttm_and_segment(rttm_file, wav_file, output_directory, force_overwrite)
 
             # 3. 检查并执行ASR识别
             if not force_overwrite and asr_exists:
-                print(f"  ⏭️  跳过已存在的ASR识别结果: {asr_output_file}")
+                self.logger.info(f"跳过已存在的ASR识别结果: {asr_output_file}")
             else:
-                print("  🎙️  开始ASR语音识别...")
+                self.logger.info("开始ASR语音识别...")
                 # 确保docs目录存在
                 os.makedirs("data/output/docs", exist_ok=True)
                 asr_result = self.asr_processor.process_audio_directory(output_directory, asr_output_file, force_overwrite)
-                print(f"  📝 ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个")
+                self.logger.info(f"ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个",
+                               extra_data={'success_count': asr_result['success'], 'error_count': asr_result['error']})
 
             # 4. 检查并执行LLM数据清洗（直接覆盖ASR文件）
             if enable_llm_cleaning:
-                print("  🔄 开始数据清洗并覆盖ASR结果...")
+                self.logger.info("开始数据清洗并覆盖ASR结果...")
                 self._initialize_llm_cleaner()
                 if self.llm_cleaner and self.llm_cleaner is not False:
                     if enable_gleaning:
-                        print("    🔄 使用Gleaning多轮清洗...")
+                        self.logger.info("使用Gleaning多轮清洗...")
                         clean_result = self.llm_cleaner.clean_markdown_file(
                             asr_output_file,
                             asr_output_file,  # 直接覆盖原文件
@@ -131,11 +134,12 @@ class AudioProcessor:
                             # 使用LLMDataCleaner的默认质量阈值
                         )
                         if clean_result["success"]:
-                            print(f"  ✨ Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}")
+                            self.logger.info(f"Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}",
+                                           extra_data={'rounds': clean_result['rounds'], 'tokens': clean_result['total_tokens'], 'quality_score': clean_result['final_quality_score']})
                         else:
-                            print(f"  ❌ Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
+                            self.logger.error(f"Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
                     else:
-                        print("    🤖 使用标准清洗...")
+                        self.logger.info("使用标准清洗...")
                         clean_result = self.llm_cleaner.clean_markdown_file(
                             asr_output_file,
                             asr_output_file,  # 直接覆盖原文件
@@ -143,19 +147,20 @@ class AudioProcessor:
                         )
                         if clean_result["success"]:
                             if 'total_tokens' in clean_result:
-                                print(f"  ✨ 标准清洗完成: {clean_result['total_tokens']} tokens")
+                                self.logger.info(f"标准清洗完成: {clean_result['total_tokens']} tokens",
+                                               extra_data={'tokens': clean_result['total_tokens']})
                             else:
-                                print(f"  ✨ 标准清洗完成")
+                                self.logger.info("标准清洗完成")
                         else:
-                            print(f"  ❌ 标准清洗失败: {clean_result.get('error', '未知错误')}")
+                            self.logger.error(f"标准清洗失败: {clean_result.get('error', '未知错误')}")
                 else:
-                    print("  ⚠️  LLM清洗器不可用，跳过数据清洗")
+                    self.logger.warning("LLM清洗器不可用，跳过数据清洗")
 
-            print(f"  ✅ {filename} 完整处理完成！")
+            self.logger.info(f"{filename} 完整处理完成！")
             return "success"
 
         except Exception as e:
-            print(f"  ❌ 处理 {wav_file} 时出错: {str(e)}")
+            self.logger.error(f"处理 {wav_file} 时出错: {str(e)}", extra_data={'file': wav_file, 'error': str(e)})
             return "error"
 
     def convert_mp3_to_wav(self, input_dir="data/input/mp3s", output_dir="data/processed/wavs"):
@@ -169,7 +174,7 @@ class AudioProcessor:
         Returns:
             dict: 转换结果统计
         """
-        print("🔄 开始MP3转WAV预处理...")
+        self.logger.info("开始MP3转WAV预处理...")
         return self.converter.convert_mp3_to_wav(input_dir, output_dir)
 
     def process_batch(self, input_dir="data/processed/wavs", enable_mp3_conversion=True, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
@@ -193,22 +198,23 @@ class AudioProcessor:
         # 步骤1: 如果启用了MP3转换，先执行转换
         if enable_mp3_conversion:
             conversion_results = self.convert_mp3_to_wav()
-            print(f"📋 MP3转换结果: 成功{conversion_results['success']}个, "
-                  f"失败{conversion_results['error']}个, "
-                  f"跳过{conversion_results['skipped']}个")
+            self.logger.info(f"MP3转换结果: 成功{conversion_results['success']}个, "
+                           f"失败{conversion_results['error']}个, "
+                           f"跳过{conversion_results['skipped']}个",
+                           extra_data=conversion_results)
 
         # 步骤2: 获取目录下所有的wav文件
         wav_files = glob.glob(f"{input_dir}/*.wav")
 
         if not wav_files:
-            print(f"⚠️  警告: {input_dir}目录下没有找到任何wav文件")
+            self.logger.warning(f"警告: {input_dir}目录下没有找到任何wav文件")
             return {"success": 0, "error": 0}
 
-        print(f"🚀 发现 {len(wav_files)} 个音频文件，开始端到端批量处理...")
+        self.logger.info(f"发现 {len(wav_files)} 个音频文件，开始端到端批量处理...", extra_data={'file_count': len(wav_files)})
         if force_overwrite:
-            print("⚠️  强制覆盖模式：重新处理所有文件")
+            self.logger.warning("强制覆盖模式：重新处理所有文件")
         else:
-            print("🧠 智能跳过模式：跳过已处理的文件")
+            self.logger.info("智能跳过模式：跳过已处理的文件")
 
         if enable_llm_cleaning:
             if enable_gleaning:
@@ -218,7 +224,7 @@ class AudioProcessor:
         else:
             llm_status = ""
 
-        print(f"流程: MP3转WAV → 说话人分离 → 音频切分 → ASR识别{llm_status} → 高质量语料")
+        self.logger.info(f"处理流程: MP3转WAV → 说话人分离 → 音频切分 → ASR识别{llm_status} → 高质量语料")
 
         success_count = 0
         error_count = 0
@@ -249,9 +255,8 @@ class AudioProcessor:
                     error_count += 1
                     pbar.set_postfix(file=filename, status="❌ 失败", refresh=True)
 
-        print(f"\n🎉 批量处理完成！")
-        print(f"✅ 成功: {success_count} 个文件")
-        print(f"⏭️  跳过: {skipped_count} 个文件")
-        print(f"❌ 失败: {error_count} 个文件")
+        self.logger.info("批量处理完成！")
+        self.logger.info(f"处理结果统计 - 成功: {success_count}个, 跳过: {skipped_count}个, 失败: {error_count}个",
+                        extra_data={'success': success_count, 'skipped': skipped_count, 'error': error_count})
 
         return {"success": success_count, "error": error_count, "skipped": skipped_count}

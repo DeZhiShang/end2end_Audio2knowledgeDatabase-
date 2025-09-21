@@ -13,6 +13,7 @@ import re
 from tqdm import tqdm
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
+from src.utils.logger import get_logger
 
 
 class ASRProcessor:
@@ -25,6 +26,7 @@ class ASRProcessor:
         Args:
             model_path: SenseVoice模型路径
         """
+        self.logger = get_logger(__name__)
         self.model_path = model_path
         self.inference_pipeline = None
         self._initialize_model()
@@ -32,7 +34,7 @@ class ASRProcessor:
     def _initialize_model(self):
         """初始化SenseVoice推理管线"""
         try:
-            print("🤖 正在初始化SenseVoice-Small模型...")
+            self.logger.info("正在初始化SenseVoice-Small模型...")
             self.inference_pipeline = pipeline(
                 task=Tasks.auto_speech_recognition,
                 model=self.model_path,
@@ -40,9 +42,9 @@ class ASRProcessor:
                 device="cuda:0",
                 languege="zh"
             )
-            print("✅ SenseVoice模型初始化成功")
+            self.logger.info("SenseVoice模型初始化成功", extra_data={'model_path': self.model_path})
         except Exception as e:
-            print(f"❌ SenseVoice模型初始化失败: {str(e)}")
+            self.logger.error(f"SenseVoice模型初始化失败: {str(e)}", extra_data={'model_path': self.model_path, 'error': str(e)})
             raise
 
     def extract_speaker_from_filename(self, filename):
@@ -123,7 +125,7 @@ class ASRProcessor:
             }
 
         except Exception as e:
-            print(f"❌ 处理音频文件 {wav_file} 时出错: {str(e)}")
+            self.logger.error(f"处理音频文件 {wav_file} 时出错: {str(e)}", extra_data={'file': wav_file, 'error': str(e)})
             return {
                 'filename': os.path.basename(wav_file),
                 'speaker_id': self.extract_speaker_from_filename(os.path.basename(wav_file)),
@@ -167,22 +169,22 @@ class ASRProcessor:
         """
         # 检查是否已经处理过
         if not force_overwrite and os.path.exists(output_file):
-            print(f"⏭️  跳过已存在的ASR结果: {output_file}")
+            self.logger.info(f"跳过已存在的ASR结果: {output_file}")
             return {"success": 0, "error": 0, "skipped": 1, "total": 0}
 
         if not os.path.exists(audio_dir):
-            print(f"❌ 音频目录不存在: {audio_dir}")
+            self.logger.error(f"音频目录不存在: {audio_dir}")
             return {"success": 0, "error": 1, "skipped": 0, "total": 0}
 
         # 获取排序后的音频文件
         audio_files = self.get_sorted_audio_files(audio_dir)
 
         if not audio_files:
-            print(f"⚠️  警告: {audio_dir} 目录下没有找到任何wav文件")
+            self.logger.warning(f"警告: {audio_dir} 目录下没有找到任何wav文件")
             return {"success": 0, "error": 0, "skipped": 0, "total": 0}
 
-        print(f"📁 处理目录: {audio_dir}")
-        print(f"🎵 发现 {len(audio_files)} 个音频文件")
+        self.logger.info(f"处理目录: {audio_dir}")
+        self.logger.info(f"发现 {len(audio_files)} 个音频文件", extra_data={'file_count': len(audio_files)})
 
         # 创建输出目录
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -211,9 +213,9 @@ class ASRProcessor:
         # 生成markdown内容
         self._generate_markdown_output(results, output_file, audio_dir)
 
-        print(f"📝 ASR结果已保存到: {output_file}")
-        print(f"✅ 成功: {success_count} 个文件")
-        print(f"❌ 失败: {error_count} 个文件")
+        self.logger.info(f"ASR结果已保存到: {output_file}")
+        self.logger.info(f"ASR处理结果 - 成功: {success_count}个, 失败: {error_count}个",
+                        extra_data={'success_count': success_count, 'error_count': error_count})
 
         return {
             "success": success_count,
@@ -248,7 +250,7 @@ class ASRProcessor:
 
                 f.write(f"**{speaker_id}**: {text}\n\n")
 
-        print(f"📄 成功生成markdown文件: {output_file}")
+        self.logger.info(f"成功生成markdown文件: {output_file}")
 
     def _get_current_time(self):
         """获取当前时间字符串"""

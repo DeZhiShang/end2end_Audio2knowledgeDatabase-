@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import torchaudio
 import os
 from tqdm import tqdm
+from src.utils.logger import get_logger
 
 
 class AudioSegmentation:
@@ -17,7 +18,7 @@ class AudioSegmentation:
 
     def __init__(self):
         """初始化音频切分器"""
-        pass
+        self.logger = get_logger(__name__)
 
     def check_segmentation_exists(self, output_dir):
         """
@@ -49,7 +50,7 @@ class AudioSegmentation:
         # 检查是否已经处理过
         if not force_overwrite and self.check_segmentation_exists(output_dir):
             wav_files = [f for f in os.listdir(output_dir) if f.endswith('.wav')]
-            print(f"  ⏭️  跳过已切分的音频，发现{len(wav_files)}个片段: {output_dir}")
+            self.logger.info(f"跳过已切分的音频，发现{len(wav_files)}个片段: {output_dir}")
             return True
         # 加载原始音频
         waveform, sample_rate = torchaudio.load(wav_file)
@@ -78,7 +79,7 @@ class AudioSegmentation:
 
         # 按起始时间排序，确保处理顺序正确
         segments.sort(key=lambda x: x['start_time'])
-        print(f"📊 读取到 {len(segments)} 个音频片段，按起始时间排序")
+        self.logger.info(f"读取到 {len(segments)} 个音频片段，按起始时间排序", extra_data={'segment_count': len(segments)})
 
         # 使用tqdm显示音频切分进度
         segment_count = 0
@@ -91,7 +92,7 @@ class AudioSegmentation:
 
                 # 验证时间逻辑
                 if duration <= 0:
-                    print(f"⚠️ 跳过无效时长片段: {start_time:.3f}s, 时长={duration:.3f}s")
+                    self.logger.warning(f"跳过无效时长片段: {start_time:.3f}s, 时长={duration:.3f}s")
                     continue
 
                 # 计算样本索引
@@ -100,7 +101,7 @@ class AudioSegmentation:
 
                 # 确保不超出音频长度
                 if start_sample >= waveform.shape[1]:
-                    print(f"⚠️ 跳过超出音频长度的片段: {start_time:.3f}s")
+                    self.logger.warning(f"跳过超出音频长度的片段: {start_time:.3f}s")
                     continue
 
                 if end_sample > waveform.shape[1]:
@@ -109,7 +110,7 @@ class AudioSegmentation:
 
                 # 确保起始样本小于结束样本
                 if start_sample >= end_sample:
-                    print(f"⚠️ 跳过无效样本范围: start={start_sample}, end={end_sample}")
+                    self.logger.warning(f"跳过无效样本范围: start={start_sample}, end={end_sample}")
                     continue
 
                 # 切分音频片段
@@ -131,5 +132,5 @@ class AudioSegmentation:
                     refresh=True
                 )
 
-        print(f"成功切分 {segment_count} 个音频片段")
+        self.logger.info(f"成功切分 {segment_count} 个音频片段", extra_data={'segment_count': segment_count})
         return True

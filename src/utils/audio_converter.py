@@ -9,6 +9,7 @@ import torch
 import torchaudio
 from tqdm import tqdm
 from pathlib import Path
+from src.utils.logger import get_logger
 
 
 class AudioConverter:
@@ -21,8 +22,9 @@ class AudioConverter:
         Args:
             device: 设备类型，默认使用cuda:0
         """
+        self.logger = get_logger(__name__)
         self.device = device if torch.cuda.is_available() else "cpu"
-        print(f"🔧 音频转换器初始化完成，使用设备: {self.device}")
+        self.logger.info(f"音频转换器初始化完成，使用设备: {self.device}", extra_data={'device': self.device})
 
     def convert_single_file(self, input_file, output_file, target_sample_rate=16000):
         """
@@ -64,7 +66,7 @@ class AudioConverter:
             return True
 
         except Exception as e:
-            print(f"❌ 转换文件 {input_file} 时出错: {str(e)}")
+            self.logger.error(f"转换文件 {input_file} 时出错: {str(e)}", extra_data={'file': input_file, 'error': str(e)})
             return False
 
     def convert_mp3_to_wav(self, input_dir="mp3s", output_dir="wavs", target_sample_rate=16000):
@@ -86,11 +88,11 @@ class AudioConverter:
         mp3_files = glob.glob(f"{input_dir}/*.mp3")
 
         if not mp3_files:
-            print(f"⚠️  警告: {input_dir}目录下没有找到任何MP3文件")
+            self.logger.warning(f"警告: {input_dir}目录下没有找到任何MP3文件")
             return {"success": 0, "error": 0, "skipped": 0}
 
-        print(f"🚀 发现 {len(mp3_files)} 个MP3文件，开始批量转换...")
-        print(f"转换流程: MP3 → 加载到{self.device} → 重采样到{target_sample_rate}Hz → 保存为WAV")
+        self.logger.info(f"发现 {len(mp3_files)} 个MP3文件，开始批量转换...", extra_data={'file_count': len(mp3_files)})
+        self.logger.info(f"转换流程: MP3 → 加载到{self.device} → 重采样到{target_sample_rate}Hz → 保存为WAV")
 
         success_count = 0
         error_count = 0
@@ -108,7 +110,7 @@ class AudioConverter:
 
                 # 检查WAV文件是否已存在
                 if os.path.exists(wav_file):
-                    print(f"  ⏭️  跳过已存在的文件: {wav_file}")
+                    self.logger.info(f"跳过已存在的文件: {wav_file}")
                     skipped_count += 1
                     pbar.set_postfix(file=filename, status="⏭️ 跳过", refresh=True)
                     continue
@@ -117,15 +119,14 @@ class AudioConverter:
                 if self.convert_single_file(mp3_file, wav_file, target_sample_rate):
                     success_count += 1
                     pbar.set_postfix(file=filename, status="✅ 完成", refresh=True)
-                    print(f"  ✅ 转换完成: {mp3_file} → {wav_file}")
+                    self.logger.info(f"转换完成: {mp3_file} → {wav_file}")
                 else:
                     error_count += 1
                     pbar.set_postfix(file=filename, status="❌ 失败", refresh=True)
 
-        print(f"\n🎉 批量转换完成！")
-        print(f"✅ 成功转换: {success_count} 个文件")
-        print(f"❌ 转换失败: {error_count} 个文件")
-        print(f"⏭️  跳过已存在: {skipped_count} 个文件")
+        self.logger.info("批量转换完成！")
+        self.logger.info(f"转换结果统计 - 成功: {success_count}个, 失败: {error_count}个, 跳过: {skipped_count}个",
+                        extra_data={'success_count': success_count, 'error_count': error_count, 'skipped_count': skipped_count})
 
         return {
             "success": success_count,
@@ -153,5 +154,5 @@ class AudioConverter:
                 "encoding": metadata.encoding
             }
         except Exception as e:
-            print(f"❌ 获取音频信息失败: {str(e)}")
+            self.logger.error(f"获取音频信息失败: {str(e)}", extra_data={'file': audio_file, 'error': str(e)})
             return None

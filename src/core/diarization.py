@@ -20,6 +20,7 @@ from pyannote.audio import Pipeline
 import torch
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 import torchaudio
+from src.utils.logger import get_logger
 
 
 class SpeakerDiarization:
@@ -36,6 +37,8 @@ class SpeakerDiarization:
             auth_token: HuggingFace访问令牌，如果为None则从环境变量HUGGINGFACE_TOKEN获取
             device: 计算设备
         """
+        self.logger = get_logger(__name__)
+
         # 如果未提供token，从环境变量获取
         if auth_token is None:
             auth_token = os.getenv('HUGGINGFACE_TOKEN')
@@ -47,7 +50,7 @@ class SpeakerDiarization:
             use_auth_token=auth_token
         )
         self.pipeline.to(torch.device(device))
-        print(f"说话人分离模型已加载到 {device}")
+        self.logger.info(f"说话人分离模型已加载到 {device}", extra_data={'device': device, 'model': model_name})
 
     def process(self, wav_file, num_speakers=2):
         """

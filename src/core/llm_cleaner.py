@@ -21,12 +21,16 @@ except ImportError:
 # 加载环境变量
 load_dotenv()
 
+from src.utils.logger import get_logger
+
 
 class LLMDataCleaner:
     """LLM数据清洗器：使用大语言模型清洗ASR识别结果"""
 
     def __init__(self):
         """初始化LLM清洗器"""
+        self.logger = get_logger(__name__)
+
         if openai is None:
             raise ImportError("请先安装openai包: pip install openai")
 
@@ -323,7 +327,7 @@ class LLMDataCleaner:
             }
 
         except Exception as e:
-            print(f"⚠️ 质量评估失败: {str(e)}")
+            self.logger.warning(f"质量评估失败: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
@@ -350,7 +354,7 @@ class LLMDataCleaner:
         max_rounds = max_rounds or self.max_gleaning_rounds
         quality_threshold = quality_threshold or self.quality_threshold
 
-        print(f"🔄 开始gleaning多轮清洗 (最大{max_rounds}轮，质量阈值{quality_threshold})")
+        self.logger.info(f"开始gleaning多轮清洗 (最大{max_rounds}轮，质量阈值{quality_threshold})")
 
         # 存储所有轮次的结果
         rounds_results = []
@@ -359,7 +363,7 @@ class LLMDataCleaner:
 
         try:
             # 第一轮：基础清洗
-            print("  🧹 第1轮: 基础清洗...")
+            self.logger.info("第1轮: 基础清洗...")
             first_round_result = self.clean_asr_result(current_content)
 
             if not first_round_result["success"]:
@@ -386,11 +390,11 @@ class LLMDataCleaner:
                 "evaluation": quality_eval
             })
 
-            print(f"    💯 第1轮质量评分: {overall_score:.2f}")
+            self.logger.info(f"    💯 第1轮质量评分: {overall_score:.2f}")
 
             # 检查是否已达到质量要求
             if overall_score >= quality_threshold:
-                print(f"  ✅ 第1轮已达到质量要求 ({overall_score:.2f} >= {quality_threshold})")
+                self.logger.info(f"  ✅ 第1轮已达到质量要求 ({overall_score:.2f} >= {quality_threshold})")
                 return {
                     "success": True,
                     "rounds": 1,
@@ -406,7 +410,7 @@ class LLMDataCleaner:
             previous_score = overall_score
 
             for round_num in range(2, max_rounds + 1):
-                print(f"  🔍 第{round_num}轮: Gleaning优化...")
+                self.logger.info(f"  🔍 第{round_num}轮: Gleaning优化...")
 
                 # 使用gleaning prompt
                 gleaning_prompt = self.get_gleaning_prompt(round_num) + "\n" + current_content
@@ -439,11 +443,11 @@ class LLMDataCleaner:
                     "evaluation": quality_eval
                 })
 
-                print(f"    💯 第{round_num}轮质量评分: {current_score:.2f} (改进: {improvement:+.3f})")
+                self.logger.info(f"    💯 第{round_num}轮质量评分: {current_score:.2f} (改进: {improvement:+.3f})")
 
                 # 检查停止条件
                 if current_score >= quality_threshold:
-                    print(f"  ✅ 达到质量阈值 ({current_score:.2f} >= {quality_threshold})")
+                    self.logger.info(f"  ✅ 达到质量阈值 ({current_score:.2f} >= {quality_threshold})")
                     return {
                         "success": True,
                         "rounds": round_num,
@@ -463,7 +467,7 @@ class LLMDataCleaner:
 
             # 达到最大轮数，选择质量最高的轮次
             best_round = max(rounds_results, key=lambda r: r["quality_score"])
-            print(f"  🏁 达到最大轮数 ({max_rounds})，选择最佳结果 (第{best_round['round']}轮)")
+            self.logger.info(f"  🏁 达到最大轮数 ({max_rounds})，选择最佳结果 (第{best_round['round']}轮)")
 
             return {
                 "success": True,
@@ -477,7 +481,7 @@ class LLMDataCleaner:
             }
 
         except Exception as e:
-            print(f"❌ Gleaning清洗失败: {str(e)}")
+            self.logger.error(f"Gleaning清洗失败: {str(e)}")
             # 如果有部分结果，返回最佳结果
             if rounds_results:
                 best_round = max(rounds_results, key=lambda r: r["quality_score"])
@@ -538,7 +542,7 @@ class LLMDataCleaner:
             }
 
         except Exception as e:
-            print(f"❌ LLM清洗失败: {str(e)}")
+            self.logger.error(f"LLM清洗失败: {str(e)}")
             return {
                 "success": False,
                 "original_content": asr_content,
@@ -578,12 +582,12 @@ class LLMDataCleaner:
             with open(input_file, 'r', encoding='utf-8') as f:
                 original_content = f.read()
 
-            print(f"📖 读取ASR结果文件: {input_file}")
-            print(f"📄 原始内容长度: {len(original_content)} 字符")
+            self.logger.info(f"📖 读取ASR结果文件: {input_file}")
+            self.logger.info(f"📄 原始内容长度: {len(original_content)} 字符")
 
             # 选择清洗方法
             if enable_gleaning:
-                print("🔄 使用Gleaning多轮清洗...")
+                self.logger.info("🔄 使用Gleaning多轮清洗...")
                 clean_result = self.clean_with_gleaning(original_content, max_rounds, quality_threshold)
 
                 if clean_result["success"] or clean_result.get("partial_success"):
@@ -592,9 +596,9 @@ class LLMDataCleaner:
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(clean_result["final_content"])
 
-                    print(f"✅ Gleaning清洗完成，最终结果已保存至: {output_file}")
-                    print(f"📊 处理统计: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens")
-                    print(f"💯 最终质量评分: {clean_result['final_quality_score']:.2f}")
+                    self.logger.info(f"✅ Gleaning清洗完成，最终结果已保存至: {output_file}")
+                    self.logger.info(f"📊 处理统计: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens")
+                    self.logger.info(f"💯 最终质量评分: {clean_result['final_quality_score']:.2f}")
 
                     return {
                         "success": True,
@@ -611,7 +615,7 @@ class LLMDataCleaner:
                         "rounds_details": clean_result.get("rounds_details", [])
                     }
                 else:
-                    print(f"❌ Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
+                    self.logger.error(f"Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
                     return {
                         "success": False,
                         "input_file": input_file,
@@ -619,7 +623,7 @@ class LLMDataCleaner:
                         "gleaning_enabled": True
                     }
             else:
-                print("🤖 使用标准单轮清洗...")
+                self.logger.info("🤖 使用标准单轮清洗...")
                 clean_result = self.clean_asr_result(original_content)
 
                 if clean_result["success"]:
@@ -628,8 +632,8 @@ class LLMDataCleaner:
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(clean_result["cleaned_content"])
 
-                    print(f"✅ 标准清洗完成，结果保存至: {output_file}")
-                    print(f"📊 Token使用情况: {clean_result['token_usage']['total_tokens']} tokens")
+                    self.logger.info(f"✅ 标准清洗完成，结果保存至: {output_file}")
+                    self.logger.info(f"📊 Token使用情况: {clean_result['token_usage']['total_tokens']} tokens")
 
                     return {
                         "success": True,
@@ -641,7 +645,7 @@ class LLMDataCleaner:
                         "token_usage": clean_result["token_usage"]
                     }
                 else:
-                    print(f"❌ 标准清洗失败: {clean_result.get('error', '未知错误')}")
+                    self.logger.error(f"标准清洗失败: {clean_result.get('error', '未知错误')}")
                     return {
                         "success": False,
                         "input_file": input_file,
@@ -650,7 +654,7 @@ class LLMDataCleaner:
                     }
 
         except Exception as e:
-            print(f"❌ 处理文件时出错: {str(e)}")
+            self.logger.error(f"处理文件时出错: {str(e)}")
             return {
                 "success": False,
                 "input_file": input_file,
@@ -688,7 +692,7 @@ class LLMDataCleaner:
             }
 
         method_name = "Gleaning多轮清洗" if enable_gleaning else "标准清洗"
-        print(f"🚀 开始批量{method_name}，发现 {len(md_files)} 个文件")
+        self.logger.info(f"🚀 开始批量{method_name}，发现 {len(md_files)} 个文件")
 
         # 创建输出目录
         os.makedirs(output_dir, exist_ok=True)
@@ -704,7 +708,7 @@ class LLMDataCleaner:
             input_file = os.path.join(input_dir, md_file)
             output_file = os.path.join(output_dir, md_file)
 
-            print(f"\n📄 处理文件: {md_file}")
+            self.logger.info(f"\n📄 处理文件: {md_file}")
             result = self.clean_markdown_file(
                 input_file, output_file, enable_gleaning, max_rounds, quality_threshold
             )
@@ -725,14 +729,14 @@ class LLMDataCleaner:
         avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
         avg_rounds = total_rounds / success_count if success_count > 0 else 0
 
-        print(f"\n🎉 批量{method_name}完成！")
-        print(f"✅ 成功: {success_count} 个文件")
-        print(f"❌ 失败: {error_count} 个文件")
-        print(f"📊 总计使用: {total_tokens} tokens")
+        self.logger.info(f"\n🎉 批量{method_name}完成！")
+        self.logger.info(f"✅ 成功: {success_count} 个文件")
+        self.logger.info(f"失败: {error_count} 个文件")
+        self.logger.info(f"📊 总计使用: {total_tokens} tokens")
 
         if enable_gleaning and quality_scores:
-            print(f"💯 平均质量评分: {avg_quality:.2f}")
-            print(f"🔄 平均清洗轮数: {avg_rounds:.1f}")
+            self.logger.info(f"💯 平均质量评分: {avg_quality:.2f}")
+            self.logger.info(f"🔄 平均清洗轮数: {avg_rounds:.1f}")
 
         return {
             "success": True,
