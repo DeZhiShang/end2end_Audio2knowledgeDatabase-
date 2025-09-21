@@ -1,0 +1,27 @@
+# 端到端音频处理系统依赖
+
+# 深度学习框架
+torch>=1.13.0
+torchaudio>=0.13.0
+
+# 语音识别模型
+modelscope>=1.8.0
+funasr>=0.8.0
+
+# 说话人分离
+pyannote.audio>=3.1.0
+speechbrain>=0.5.15
+
+# 音频处理
+librosa>=0.9.0
+soundfile>=0.12.0
+
+# 进度条和工具
+tqdm>=4.64.0
+
+# 文件操作
+glob2>=0.7
+
+# LLM数据清洗
+openai>=1.0.0
+python-dotenv>=1.0.0

@@ -1,12 +1,15 @@
-
 #!/usr/bin/env python3
 """
 端到端音频处理系统
-主入口文件
+根目录主入口文件 - 重构后的项目结构
 """
 
-import warnings
+import sys
 import os
+import warnings
+
+# 将项目根目录添加到Python路径中
+sys.path.insert(0, os.path.dirname(__file__))
 
 # 过滤烦人的警告信息
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
@@ -18,7 +21,7 @@ warnings.filterwarnings("ignore", message=".*std().*degrees of freedom.*")
 # 设置环境变量减少一些库的输出
 os.environ['PYTHONWARNINGS'] = 'ignore'
 
-from processor import AudioProcessor
+from src.utils.processor import AudioProcessor
 
 
 def main():
@@ -36,20 +39,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# # 时间戳拼接算法，用以确保说话人语音的连续
-
-# # senseVoice-small识别
-
-
-# from modelscope.pipelines import pipeline
-# from modelscope.utils.constant import Tasks
-
-# inference_pipeline = pipeline(
-#     task=Tasks.auto_speech_recognition,
-#     model='/home/dzs-ai-4/dzs-dev/end2end_autio2kg/senseVoice-small',
-#     model_revision="master",
-#     device="cuda:0",)
-
-# rec_result = inference_pipeline('/home/dzs-ai-4/dzs-dev/end2end_autio2kg/wavs/111.wav')
-# print(rec_result)

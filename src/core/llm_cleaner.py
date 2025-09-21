@@ -47,7 +47,7 @@ class LLMDataCleaner:
         # Gleaning机制配置
         self.max_gleaning_rounds = 3  # 最大清洗轮数
         self.quality_threshold = 0.90  # 质量阈值(0-1)
-        self.min_improvement_threshold = 0.05  # 最小改进阈值
+        # 移除最小改进阈值限制，以质量达标为准
 
     def get_cleaning_prompt(self) -> str:
         """
@@ -200,10 +200,10 @@ class LLMDataCleaner:
 ## 优化原则
 
 ### 核心要求：
-1. **渐进式改进**：在前一轮基础上小幅优化，不做大规模修改
-2. **质量导向**：每次修改都应提升对话质量
-3. **保持真实**：绝不编造或添加不存在的内容
-4. **专业标准**：确保客服对话达到专业服务标准
+1. **质量导向**：以对话质量达标为准，不设置最小改动限制
+2. **保持真实**：绝不编造或添加不存在的内容
+3. **专业标准**：确保客服对话达到专业服务标准
+4. **渐进改进**：在前一轮基础上继续优化
 
 ### 具体标准：
 - **语言流畅度**: 自然、专业、易懂
@@ -213,33 +213,30 @@ class LLMDataCleaner:
 
 ## 输出要求
 
-如果内容已经足够高质量，无需大幅修改，请保持原有内容并说明：
-```
-## 第{round_number}轮清洗评估
-本轮评估认为对话质量已达到高标准，仅做微调或保持原状。
-```
-
-如果需要优化，请按以下格式输出：
+**重要**：无论内容质量如何，都必须输出完整的对话内容，按以下格式输出：
 
 ```
-# 第{round_number}轮优化后的客服对话
+# 第{round_number}轮处理后的客服对话
 
-**SPEAKER_00**: [优化后的对话内容]
+**SPEAKER_00**: [处理后的对话内容，如无需修改则保持原内容]
 
-**SPEAKER_01**: [优化后的对话内容]
+**SPEAKER_01**: [处理后的对话内容，如无需修改则保持原内容]
 
-## 第{round_number}轮优化说明
-- 流畅性改进：[说明语言表达的改进]
-- 专业性提升：[说明术语和表述的优化]
-- 逻辑完善：[说明逻辑结构的改进]
-- 其他优化：[说明其他方面的改进]
+## 第{round_number}轮处理说明
+- 主要改进：[说明本轮的主要改进，如无改进则说明"内容质量已达标，保持原状"]
+- 流畅性：[说明语言表达方面的处理]
+- 专业性：[说明术语和表述方面的处理]
+- 逻辑性：[说明逻辑结构方面的处理]
 
 ## 质量评估
 - 流畅度：[1-10分评分]
 - 专业度：[1-10分评分]
 - 完整度：[1-10分评分]
 - 准确度：[1-10分评分]
+- 综合评分：[1-10分综合评分]
 ```
+
+**注意**：即使内容已经很高质量，也必须完整输出对话内容，不能只输出评估信息。
 
 现在请对以下对话进行第{round_number}轮精细化清洗：
 
@@ -458,21 +455,7 @@ class LLMDataCleaner:
                         "early_stop_reason": "quality_threshold_met"
                     }
 
-                # 检查改进幅度
-                if improvement < self.min_improvement_threshold:
-                    print(f"  ⏹️ 改进幅度过小 ({improvement:.3f} < {self.min_improvement_threshold})")
-                    # 选择质量最高的轮次作为最终结果
-                    best_round = max(rounds_results, key=lambda r: r["quality_score"])
-                    return {
-                        "success": True,
-                        "rounds": round_num,
-                        "final_content": best_round["content"],
-                        "final_quality_score": best_round["quality_score"],
-                        "total_tokens": total_tokens,
-                        "rounds_details": rounds_results,
-                        "improvement_achieved": current_score > rounds_results[0]["quality_score"],
-                        "early_stop_reason": "minimal_improvement"
-                    }
+                # 移除最小改进阈值检查，继续下一轮优化
 
                 # 更新当前内容和分数
                 current_content = round_result
@@ -609,7 +592,7 @@ class LLMDataCleaner:
                     with open(output_file, 'w', encoding='utf-8') as f:
                         f.write(clean_result["final_content"])
 
-                    print(f"✅ Gleaning清洗完成，结果保存至: {output_file}")
+                    print(f"✅ Gleaning清洗完成，最终结果已保存至: {output_file}")
                     print(f"📊 处理统计: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens")
                     print(f"💯 最终质量评分: {clean_result['final_quality_score']:.2f}")
 

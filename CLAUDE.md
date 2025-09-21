@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 数据流管道
 ```
-原始录音(.wav/.mp3) → 说话人分离(pyannote) → 时间戳文件(.rttm) → 音频切分(torchaudio) → 语音识别(SenseVoice) → LLM数据清洗(qwen-plus) → 高质量知识库语料
+原始录音(.wav/.mp3) → 说话人分离(pyannote) → 时间戳文件(.rttm) → 音频切分(torchaudio) → 语音识别(SenseVoice) → [覆盖模式] → LLM数据清洗(qwen-plus) → 高质量知识库语料(同一文件)
 ```
 
 ### 核心组件
@@ -47,26 +47,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 目录结构
 
 ```
-.
-├── main.py                     # 主程序入口
-├── processor.py                # 音频处理器（统一流程管理）
-├── diarization.py             # 说话人分离模块
-├── audio_segmentation.py      # 音频切分模块
-├── asr.py                     # 语音识别模块
-├── llm_cleaner.py             # LLM数据清洗模块
-├── audio_converter.py         # 音频格式转换模块
-├── test_llm_cleaning.py       # LLM清洗功能测试脚本
-├── requirement.md             # 项目需求文档
-├── LLM_CLEANING_GUIDE.md      # LLM清洗功能使用指南
-├── mp3s/                      # 原始MP3音频文件
-├── wavs/                      # WAV格式音频文件
-├── rttms/                     # 说话人分离结果文件
-├── docs/                      # ASR识别结果文件
-├── docs_cleaned/              # LLM清洗后的高质量语料
-└── senseVoice-small/          # 本地SenseVoice模型
-    ├── config.yaml           # 模型配置
-    ├── configuration.json    # 模型参数
-    └── README.md             # 模型说明文档
+end2end_audio2kg/
+├── main.py                     # 主程序入口（重构后）
+├── requirements.txt            # 项目依赖
+├── src/                        # 核心源代码
+│   ├── __init__.py
+│   ├── main.py                # 内部主程序入口
+│   ├── core/                  # 核心处理模块
+│   │   ├── __init__.py
+│   │   ├── diarization.py     # 说话人分离
+│   │   ├── audio_segmentation.py # 音频切分
+│   │   ├── asr.py            # 语音识别
+│   │   └── llm_cleaner.py    # LLM数据清洗
+│   └── utils/                 # 工具模块
+│       ├── __init__.py
+│       ├── audio_converter.py # 音频格式转换
+│       └── processor.py       # 统一处理器
+├── data/                      # 数据目录
+│   ├── input/                 # 输入数据
+│   │   └── mp3s/             # 原始MP3文件
+│   ├── processed/            # 处理中数据
+│   │   ├── wavs/             # WAV格式文件
+│   │   └── rttms/            # 说话人分离结果
+│   └── output/               # 输出数据
+│       └── docs/             # 最终MD文件（ASR→LLM清洗覆盖模式）
+├── models/                   # 模型目录
+│   └── senseVoice-small/    # 本地SenseVoice模型
+├── config/                   # 配置文件
+│   └── requirements.txt     # 依赖备份
+├── tests/                    # 测试文件
+├── docs/                    # 项目文档（预留）
+├── README.md                # 项目说明文档
+└── CLAUDE.md               # Claude Code使用指南
 ```
 
 ## 开发指南

@@ -18,7 +18,7 @@ from modelscope.utils.constant import Tasks
 class ASRProcessor:
     """ASR语音识别处理器"""
 
-    def __init__(self, model_path='/home/dzs-ai-4/dzs-dev/end2end_autio2kg/senseVoice-small'):
+    def __init__(self, model_path='/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small'):
         """
         初始化ASR处理器
 

@@ -1,12 +1,11 @@
-# 音频文件和数据目录
-wavs/
-mp3s/
-rttms/
-docs/
+# 数据目录（包含所有音频文件和处理结果）
+data/
 
-# 模型文件
-senseVoice-small/
-paraformer/
+# 模型文件目录
+models/
+
+# Claude配置目录
+.claude/
 *.bin
 *.pt
 *.pth

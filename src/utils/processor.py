@@ -6,11 +6,11 @@
 import os
 import glob
 from tqdm import tqdm
-from diarization import SpeakerDiarization
-from audio_segmentation import AudioSegmentation
-from audio_converter import AudioConverter
-from asr import ASRProcessor
-from llm_cleaner import LLMDataCleaner
+from src.core.diarization import SpeakerDiarization
+from src.core.audio_segmentation import AudioSegmentation
+from src.utils.audio_converter import AudioConverter
+from src.core.asr import ASRProcessor
+from src.core.llm_cleaner import LLMDataCleaner
 
 
 class AudioProcessor:
@@ -61,25 +61,21 @@ class AudioProcessor:
             print(f"\n🎵 开始处理: {wav_file}")
 
             # 检查是否完全跳过（四个步骤都已完成）
-            rttm_file = f"rttms/{filename}.rttm"
-            output_directory = f"wavs/{filename}"
-            asr_output_file = f"docs/{filename}.md"
+            rttm_file = f"data/processed/rttms/{filename}.rttm"
+            output_directory = f"data/processed/wavs/{filename}"
+            asr_output_file = f"data/output/docs/{filename}.md"
 
-            # 统一输出到docs目录
-            if enable_llm_cleaning:
-                cleaned_output_dir = "docs"
-                cleaned_output_file = f"{cleaned_output_dir}/{filename}.md"
-            else:
-                cleaned_output_file = None
+            # 统一输出到docs目录（ASR和LLM清洗都用同一文件）
+            final_output_file = asr_output_file  # 无论是否清洗，都输出到同一文件
 
             rttm_exists = self.diarizer.check_rttm_exists(rttm_file)
             segmentation_exists = self.segmenter.check_segmentation_exists(output_directory)
             asr_exists = self.asr_processor.check_asr_exists(asr_output_file)
-            cleaned_exists = enable_llm_cleaning and cleaned_output_file and os.path.exists(cleaned_output_file)
+            # 检查最终文件是否存在（不区分ASR或清洗后）
+            final_exists = os.path.exists(final_output_file)
 
-            # 完全跳过条件：所有必要步骤都已完成
-            # 如果启用LLM清洗，asr_exists表示已清洗完成；否则表示ASR完成
-            skip_condition = (rttm_exists and segmentation_exists and asr_exists)
+            # 完全跳过条件：所有必要步骤都已完成，最终文件存在
+            skip_condition = (rttm_exists and segmentation_exists and final_exists)
 
             if not force_overwrite and skip_condition:
                 # 更严谨的检查：确保音频切分目录存在且包含文件
@@ -89,11 +85,8 @@ class AudioProcessor:
                 else:
                     file_count_msg = "音频目录不存在但ASR结果存在"
 
-                method_desc = "Gleaning清洗" if enable_llm_cleaning and enable_gleaning else "ASR识别"
-                if not enable_llm_cleaning:
-                    method_desc = "ASR识别"
-
-                print(f"  ⏭️  完全跳过：所有步骤均已完成，{file_count_msg}，最终结果: {asr_output_file} ({method_desc})")
+                method_desc = "Gleaning清洗" if enable_llm_cleaning and enable_gleaning else ("标准清洗" if enable_llm_cleaning else "ASR识别")
+                print(f"  ⏭️  完全跳过：所有步骤均已完成，{file_count_msg}，最终结果: {final_output_file} ({method_desc})")
                 return "skipped"
 
             # 1. 检查并执行说话人分离
@@ -119,7 +112,7 @@ class AudioProcessor:
             else:
                 print("  🎙️  开始ASR语音识别...")
                 # 确保docs目录存在
-                os.makedirs("docs", exist_ok=True)
+                os.makedirs("data/output/docs", exist_ok=True)
                 asr_result = self.asr_processor.process_audio_directory(output_directory, asr_output_file, force_overwrite)
                 print(f"  📝 ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个")
 
@@ -165,7 +158,7 @@ class AudioProcessor:
             print(f"  ❌ 处理 {wav_file} 时出错: {str(e)}")
             return "error"
 
-    def convert_mp3_to_wav(self, input_dir="mp3s", output_dir="wavs"):
+    def convert_mp3_to_wav(self, input_dir="data/input/mp3s", output_dir="data/processed/wavs"):
         """
         批量转换MP3文件为WAV格式
 
@@ -179,7 +172,7 @@ class AudioProcessor:
         print("🔄 开始MP3转WAV预处理...")
         return self.converter.convert_mp3_to_wav(input_dir, output_dir)
 
-    def process_batch(self, input_dir="wavs", enable_mp3_conversion=True, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
+    def process_batch(self, input_dir="data/processed/wavs", enable_mp3_conversion=True, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
         """
         批量处理指定目录下的所有音频文件
         支持自动MP3转WAV预处理、智能跳过和LLM数据清洗（含Gleaning）
