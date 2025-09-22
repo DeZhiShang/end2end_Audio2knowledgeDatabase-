@@ -16,11 +16,14 @@ from src.core.async_llm_processor import get_async_llm_processor, shutdown_async
 from src.utils.logger import get_logger
 import atexit
 
+# 知识库集成模块
+from src.core.knowledge_integration import get_knowledge_processor, cleanup_knowledge_processor
+
 
 class AudioProcessor:
     """音频处理器：管理端到端的音频处理流程"""
 
-    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4):
+    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4, enable_knowledge_base: bool = True):
         """初始化处理器"""
         self.logger = get_logger(__name__)
         self.converter = AudioConverter()
@@ -39,6 +42,10 @@ class AudioProcessor:
         self.max_gleaning_rounds = 3  # 最大清洗轮数
         # 注意：质量阈值由LLMDataCleaner管理，避免重复配置
 
+        # 知识库集成配置
+        self.enable_knowledge_base = enable_knowledge_base
+        self.knowledge_processor = None  # 延迟初始化知识处理器
+
         # 初始化异步LLM处理器
         if self.enable_async_llm:
             self.async_llm_processor = get_async_llm_processor()
@@ -46,11 +53,26 @@ class AudioProcessor:
             # 注册清理函数
             atexit.register(self._cleanup_async_processor)
 
+        # 初始化知识库处理器
+        if self.enable_knowledge_base:
+            self.knowledge_processor = get_knowledge_processor(
+                enable_auto_qa_extraction=True,
+                enable_auto_compaction=True
+            )
+            # 注册清理函数
+            atexit.register(self._cleanup_knowledge_processor)
+
     def _cleanup_async_processor(self):
         """清理异步处理器"""
         if self.async_llm_processor:
             self.logger.info("正在关闭异步LLM处理器...")
             self.async_llm_processor.stop(wait_for_completion=True)
+
+    def _cleanup_knowledge_processor(self):
+        """清理知识处理器"""
+        if self.knowledge_processor:
+            self.logger.info("正在关闭知识处理器...")
+            cleanup_knowledge_processor()
 
     def _initialize_llm_cleaner(self):
         """延迟初始化LLM清洗器"""
@@ -171,6 +193,19 @@ class AudioProcessor:
                             if clean_result["success"]:
                                 self.logger.info(f"Gleaning清洗完成: {clean_result['rounds']}轮, {clean_result['total_tokens']} tokens, 质量评分: {clean_result['final_quality_score']:.2f}",
                                                extra_data={'rounds': clean_result['rounds'], 'tokens': clean_result['total_tokens'], 'quality_score': clean_result['final_quality_score']})
+
+                                # 触发知识库处理（问答对抽取）
+                                if self.enable_knowledge_base and self.knowledge_processor:
+                                    try:
+                                        self.logger.info(f"触发问答对抽取: {filename}")
+                                        qa_result = self.knowledge_processor.process_cleaned_file(asr_output_file)
+                                        if qa_result["success"]:
+                                            qa_count = qa_result.get("qa_count", 0)
+                                            self.logger.info(f"✅ 问答对抽取完成: {qa_count} 个问答对")
+                                        else:
+                                            self.logger.warning(f"问答对抽取失败: {qa_result.get('error', '未知错误')}")
+                                    except Exception as e:
+                                        self.logger.error(f"问答对抽取异常: {str(e)}")
                             else:
                                 self.logger.error(f"Gleaning清洗失败: {clean_result.get('error', '未知错误')}")
                         else:
@@ -186,6 +221,19 @@ class AudioProcessor:
                                                    extra_data={'tokens': clean_result['total_tokens']})
                                 else:
                                     self.logger.info("标准清洗完成")
+
+                                # 触发知识库处理（问答对抽取）
+                                if self.enable_knowledge_base and self.knowledge_processor:
+                                    try:
+                                        self.logger.info(f"触发问答对抽取: {filename}")
+                                        qa_result = self.knowledge_processor.process_cleaned_file(asr_output_file)
+                                        if qa_result["success"]:
+                                            qa_count = qa_result.get("qa_count", 0)
+                                            self.logger.info(f"✅ 问答对抽取完成: {qa_count} 个问答对")
+                                        else:
+                                            self.logger.warning(f"问答对抽取失败: {qa_result.get('error', '未知错误')}")
+                                    except Exception as e:
+                                        self.logger.error(f"问答对抽取异常: {str(e)}")
                             else:
                                 self.logger.error(f"标准清洗失败: {clean_result.get('error', '未知错误')}")
                     else:
@@ -314,6 +362,22 @@ class AudioProcessor:
                 self.logger.info(f"异步LLM任务完成: {task_id} (耗时: {processing_time:.1f}s, {result['total_tokens']} tokens)")
             else:
                 self.logger.info(f"异步LLM任务完成: {task_id} (耗时: {processing_time:.1f}s)")
+
+            # 触发知识库处理（问答对抽取）
+            if self.enable_knowledge_base and self.knowledge_processor:
+                file_path = result.get('file_path')
+                if file_path:
+                    try:
+                        self.logger.info(f"触发问答对抽取: {os.path.basename(file_path)}")
+                        qa_result = self.knowledge_processor.process_cleaned_file(file_path)
+                        if qa_result["success"]:
+                            qa_count = qa_result.get("qa_count", 0)
+                            self.logger.info(f"✅ 问答对抽取完成: {qa_count} 个问答对")
+                        else:
+                            self.logger.warning(f"问答对抽取失败: {qa_result.get('error', '未知错误')}")
+                    except Exception as e:
+                        self.logger.error(f"问答对抽取异常: {str(e)}")
+
         else:
             error = result.get('error', '未知错误')
             self.logger.error(f"异步LLM任务失败: {task_id} - {error}")
@@ -373,3 +437,7 @@ class AudioProcessor:
         if self.enable_async_llm and self.async_llm_processor:
             self.logger.info("关闭异步LLM处理器...")
             self.async_llm_processor.stop(wait_for_completion=True)
+
+        if self.enable_knowledge_base and self.knowledge_processor:
+            self.logger.info("关闭知识处理器...")
+            self.knowledge_processor.shutdown()

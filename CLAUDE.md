@@ -200,3 +200,5 @@ python main.py
 - **原始ASR结果**: `docs/filename.md`
 - **清洗后语料**: `docs_cleaned/filename.md`
 - **处理日志**: 控制台实时显示进度和统计信息
+
+项目运行在'audio2kg'的虚拟环境中，测试时需要注意这一点

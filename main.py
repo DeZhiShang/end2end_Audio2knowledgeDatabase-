@@ -43,14 +43,15 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    logger.info("端到端音频处理系统 (异步优化版)")
-    logger.info("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频 → ASR语音识别 → [异步]Gleaning多轮清洗 → 高质量知识库语料")
+    logger.info("端到端音频处理系统 (知识库集成版)")
+    logger.info("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频 → ASR语音识别 → [异步]Gleaning多轮清洗 → 问答对抽取 → 高质量知识库")
     logger.info("=" * 100)
 
-    # 创建音频处理器（启用异步LLM）
+    # 创建音频处理器（启用异步LLM和知识库）
     processor = AudioProcessor(
         enable_async_llm=True,      # 启用异步LLM处理
-        max_concurrent_llm=4        # 最大并发LLM任务数
+        max_concurrent_llm=4,       # 最大并发LLM任务数
+        enable_knowledge_base=True  # 启用知识库集成
     )
 
     try:
@@ -68,6 +69,37 @@ def main():
                 logger.info("所有异步LLM任务已完成！")
             else:
                 logger.warning(f"等待结束，状态: {wait_result['status']}")
+
+        # 显示知识库统计信息
+        if processor.enable_knowledge_base and processor.knowledge_processor:
+            logger.info("\n" + "=" * 60)
+            logger.info("📊 知识库统计信息")
+            logger.info("=" * 60)
+
+            try:
+                kb_status = processor.knowledge_processor.get_knowledge_base_status()
+                kb_stats = kb_status.get('knowledge_base', {})
+                processing_stats = kb_status.get('processing', {})
+
+                logger.info(f"总问答对数量: {kb_stats.get('total_qa_pairs', 0)}")
+                logger.info(f"活跃缓冲区: {kb_stats.get('current_active_buffer', 'unknown')} (大小: {kb_stats.get('active_buffer_size', 0)})")
+                logger.info(f"非活跃缓冲区大小: {kb_stats.get('inactive_buffer_size', 0)}")
+                logger.info(f"处理文件总数: {processing_stats.get('total_files_processed', 0)}")
+                logger.info(f"抽取成功: {processing_stats.get('qa_extraction_success', 0)}, 失败: {processing_stats.get('qa_extraction_failed', 0)}")
+                logger.info(f"总抽取问答对: {processing_stats.get('total_qa_pairs_extracted', 0)}")
+
+                # 压缩统计
+                compaction_stats = kb_status.get('compaction', {})
+                if compaction_stats:
+                    logger.info(f"压缩次数: {compaction_stats.get('total_compactions', 0)}")
+                    compression_ratio = compaction_stats.get('compression_ratio', 0)
+                    logger.info(f"最近压缩比例: {compression_ratio:.2%}")
+
+                logger.info(f"知识库文件: data/output/knowledgeDatabase.md")
+                logger.info("=" * 60)
+
+            except Exception as e:
+                logger.error(f"获取知识库统计失败: {str(e)}")
 
     except KeyboardInterrupt:
         logger.info("\n收到中断信号，正在清理...")

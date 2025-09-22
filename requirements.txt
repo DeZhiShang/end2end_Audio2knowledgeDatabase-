@@ -25,3 +25,6 @@ glob2>=0.7
 # LLM数据清洗
 openai>=1.0.0
 python-dotenv>=1.0.0
+
+# 系统监控
+psutil>=5.9.0

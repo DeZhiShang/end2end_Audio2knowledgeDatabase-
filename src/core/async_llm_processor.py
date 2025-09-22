@@ -358,6 +358,7 @@ class AsyncLLMProcessor:
             # 添加任务元信息
             result.update({
                 'task_id': task_id,
+                'file_path': asr_file,  # 添加文件路径用于回调处理
                 'processing_time': processing_time,
                 'callback': task.get('callback')
             })
