@@ -7,7 +7,6 @@ import os
 import glob
 import torch
 import torchaudio
-from tqdm import tqdm
 from pathlib import Path
 from src.utils.logger import get_logger
 
@@ -98,31 +97,24 @@ class AudioConverter:
         error_count = 0
         skipped_count = 0
 
-        # 使用tqdm显示进度
-        with tqdm(mp3_files, desc="🎵 转换音频文件", unit="文件") as pbar:
-            for mp3_file in pbar:
-                # 生成对应的WAV文件路径
-                filename = os.path.splitext(os.path.basename(mp3_file))[0]
-                wav_file = os.path.join(output_dir, f"{filename}.wav")
+        # 批量转换音频文件
+        for mp3_file in mp3_files:
+            # 生成对应的WAV文件路径
+            filename = os.path.splitext(os.path.basename(mp3_file))[0]
+            wav_file = os.path.join(output_dir, f"{filename}.wav")
 
-                # 更新进度条显示当前文件
-                pbar.set_postfix(file=filename, refresh=True)
+            # 检查WAV文件是否已存在
+            if os.path.exists(wav_file):
+                self.logger.info(f"跳过已存在的文件: {wav_file}")
+                skipped_count += 1
+                continue
 
-                # 检查WAV文件是否已存在
-                if os.path.exists(wav_file):
-                    self.logger.info(f"跳过已存在的文件: {wav_file}")
-                    skipped_count += 1
-                    pbar.set_postfix(file=filename, status="⏭️ 跳过", refresh=True)
-                    continue
-
-                # 执行转换
-                if self.convert_single_file(mp3_file, wav_file, target_sample_rate):
-                    success_count += 1
-                    pbar.set_postfix(file=filename, status="✅ 完成", refresh=True)
-                    self.logger.info(f"转换完成: {mp3_file} → {wav_file}")
-                else:
-                    error_count += 1
-                    pbar.set_postfix(file=filename, status="❌ 失败", refresh=True)
+            # 执行转换
+            if self.convert_single_file(mp3_file, wav_file, target_sample_rate):
+                success_count += 1
+                self.logger.info(f"转换完成: {mp3_file} → {wav_file}")
+            else:
+                error_count += 1
 
         self.logger.info("批量转换完成！")
         self.logger.info(f"转换结果统计 - 成功: {success_count}个, 失败: {error_count}个, 跳过: {skipped_count}个",

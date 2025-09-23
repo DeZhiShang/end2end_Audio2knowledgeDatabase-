@@ -58,6 +58,10 @@ class KnowledgeProcessor:
             self.system_monitor.start_monitoring()
             self.logger.info("系统监控已启动")
 
+        # 检查是否需要立即初始化压缩器
+        if self.enable_auto_compaction:
+            self._check_and_initialize_compactor()
+
         self.logger.info(f"知识处理器初始化完成 - QA抽取: {enable_auto_qa_extraction}, 自动压缩: {enable_auto_compaction}, 系统监控: {enable_system_monitoring}")
 
     def _initialize_qa_extractor(self):
@@ -70,6 +74,25 @@ class KnowledgeProcessor:
                 self.logger.warning(f"问答对抽取器初始化失败: {str(e)}")
                 self.qa_extractor = False  # 标记为失败
 
+    def _check_and_initialize_compactor(self):
+        """检查知识库大小并在需要时初始化压缩器"""
+        if not self.enable_auto_compaction:
+            return
+
+        try:
+            kb_stats = self.knowledge_base.get_statistics()
+            total_qa_pairs = kb_stats.get('total_qa_pairs', 0)
+
+            # 如果问答对数量超过阈值且压缩器未初始化，则立即初始化
+            if total_qa_pairs >= 50 and self.qa_compactor is None:
+                self.logger.info(f"知识库问答对数量({total_qa_pairs})已超过阈值，启动压缩器")
+                self._initialize_qa_compactor()
+            elif total_qa_pairs < 50:
+                self.logger.debug(f"知识库问答对数量({total_qa_pairs})未达到压缩阈值(50)")
+
+        except Exception as e:
+            self.logger.warning(f"检查压缩器初始化条件失败: {str(e)}")
+
     def _initialize_qa_compactor(self):
         """延迟初始化问答对压缩器"""
         if self.qa_compactor is None:
@@ -79,7 +102,7 @@ class KnowledgeProcessor:
 
                 # 启动压缩调度器
                 if self.enable_auto_compaction:
-                    self.compaction_scheduler = CompactionScheduler(self.qa_compactor, interval_minutes=5)
+                    self.compaction_scheduler = CompactionScheduler(self.qa_compactor, interval_minutes=1)
                     self.compaction_scheduler.start_scheduler()
                     self.logger.info("自动压缩调度器启动成功")
 
@@ -156,6 +179,10 @@ class KnowledgeProcessor:
                 self.processing_stats['total_qa_pairs_extracted'] += qa_count
 
                 self.logger.info(f"✅ 文件处理成功: {os.path.basename(file_path)}, 抽取 {qa_count} 个问答对")
+
+                # 检查是否需要初始化压缩器
+                if self.enable_auto_compaction and self.qa_compactor is None:
+                    self._check_and_initialize_compactor()
 
                 return {
                     "success": True,
@@ -284,9 +311,9 @@ class KnowledgeProcessor:
                     "error": "创建快照失败"
                 }
 
-            # 执行压缩
+            # 执行压缩（默认使用LLM智能检验）
             compaction_result = self.qa_compactor.compact_qa_pairs(
-                snapshot.data, similarity_threshold
+                snapshot.data, similarity_threshold, use_llm_similarity=True
             )
 
             if compaction_result["success"]:

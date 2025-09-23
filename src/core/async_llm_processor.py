@@ -17,7 +17,7 @@ from src.utils.logger import get_logger
 class AsyncLLMProcessor:
     """异步LLM处理器：管理LLM清洗任务的异步执行"""
 
-    def __init__(self, max_concurrent_tasks: int = 4, max_retries: int = 2):
+    def __init__(self, max_concurrent_tasks: int = 16, max_retries: int = 2):
         """
         初始化异步LLM处理器
 

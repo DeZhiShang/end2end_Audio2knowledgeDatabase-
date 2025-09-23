@@ -18,7 +18,6 @@ except ImportError:
 
 from pyannote.audio import Pipeline
 import torch
-from pyannote.audio.pipelines.utils.hook import ProgressHook
 import torchaudio
 from src.utils.logger import get_logger
 
@@ -67,12 +66,10 @@ class SpeakerDiarization:
         waveform, sample_rate = torchaudio.load(wav_file)
 
         # 执行说话人分离
-        with ProgressHook() as hook:
-            diarization = self.pipeline(
-                {"waveform": waveform, "sample_rate": sample_rate},
-                hook=hook,
-                num_speakers=num_speakers
-            )
+        diarization = self.pipeline(
+            {"waveform": waveform, "sample_rate": sample_rate},
+            num_speakers=num_speakers
+        )
 
         return diarization
 

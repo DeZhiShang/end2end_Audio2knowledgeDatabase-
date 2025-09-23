@@ -5,7 +5,6 @@
 
 import os
 import glob
-from tqdm import tqdm
 from typing import Dict, Any
 from src.core.diarization import SpeakerDiarization
 from src.core.audio_segmentation import AudioSegmentation
@@ -313,30 +312,21 @@ class AudioProcessor:
         error_count = 0
         skipped_count = 0
 
-        # 使用tqdm显示批量处理进度
-        with tqdm(wav_files, desc="🎵 处理音频文件", unit="文件") as pbar:
-            for wav_file in pbar:
-                # 检查音频文件是否存在
-                if not os.path.exists(wav_file):
-                    pbar.set_postfix(status="⚠️ 文件不存在", refresh=True)
-                    error_count += 1
-                    continue
+        # 批量处理音频文件
+        for wav_file in wav_files:
+            # 检查音频文件是否存在
+            if not os.path.exists(wav_file):
+                error_count += 1
+                continue
 
-                # 更新进度条显示当前文件
-                filename = os.path.basename(wav_file)
-                pbar.set_postfix(file=filename, refresh=True)
-
-                # 执行端到端处理
-                result = self.process_single_file(wav_file, force_overwrite, enable_llm_cleaning, enable_gleaning)
-                if result == "success":
-                    success_count += 1
-                    pbar.set_postfix(file=filename, status="✅ 完成", refresh=True)
-                elif result == "skipped":
-                    skipped_count += 1
-                    pbar.set_postfix(file=filename, status="⏭️ 跳过", refresh=True)
-                else:  # error
-                    error_count += 1
-                    pbar.set_postfix(file=filename, status="❌ 失败", refresh=True)
+            # 执行端到端处理
+            result = self.process_single_file(wav_file, force_overwrite, enable_llm_cleaning, enable_gleaning)
+            if result == "success":
+                success_count += 1
+            elif result == "skipped":
+                skipped_count += 1
+            else:  # error
+                error_count += 1
 
         self.logger.info("批量处理完成！")
         self.logger.info(f"处理结果统计 - 成功: {success_count}个, 跳过: {skipped_count}个, 失败: {error_count}个",
@@ -368,8 +358,9 @@ class AudioProcessor:
                 file_path = result.get('file_path')
                 if file_path:
                     try:
-                        self.logger.info(f"触发问答对抽取: {os.path.basename(file_path)}")
-                        qa_result = self.knowledge_processor.process_cleaned_file(file_path)
+                        self.logger.info(f"触发问答对抽取: {os.path.basename(file_path)} (异步LLM清洗完成)")
+                        # 异步LLM清洗完成的文件需要强制重新抽取，但要考虑并发安全
+                        qa_result = self.knowledge_processor.process_cleaned_file(file_path, force_extraction=True)
                         if qa_result["success"]:
                             qa_count = qa_result.get("qa_count", 0)
                             self.logger.info(f"✅ 问答对抽取完成: {qa_count} 个问答对")

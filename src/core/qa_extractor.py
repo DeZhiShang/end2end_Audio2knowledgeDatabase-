@@ -66,116 +66,22 @@ class QAExtractor:
         """
         prompt = """你是一个专业的知识库构建专家，专门从博邦方舟无创血糖仪客服对话中抽取高质量问答对。
 
-## 任务背景
-- 目标：构建博邦方舟无创血糖仪的专业知识库
-- 输入：已经LLM清洗过的高质量客服对话
-- 输出：结构化的问答对，用于知识库建设
+## 任务目标
+从客服对话中抽取QA对，只需要输出问题和答案，无需其他复杂信息。
 
 ## 抽取原则
-
-### 核心要求
-1. **全面性**：确保不遗漏任何有价值的问答信息
-2. **准确性**：基于对话事实，不得编造或添加不存在的内容
-3. **专业性**：问答对应体现专业客服水准
-4. **实用性**：问答对应对实际用户有帮助
-
-### 问答对质量标准
-1. **问题明确**：问题表述清晰、具体、易理解
-2. **答案完整**：答案准确、详细、有帮助
-3. **逻辑清晰**：问答逻辑对应，避免答非所问
-4. **语言规范**：使用标准、专业的表达方式
-
-## 抽取策略
-
-### 1. 直接问答对
-- 用户明确提问，客服直接回答的内容
-- 保持问题的原始意图，优化语言表达
-
-### 2. 隐含问答对
-- 从对话中推导出的常见问题和答案
-- 基于用户需求和客服解释生成问答对
-
-### 3. 知识点问答对
-- 客服主动介绍的产品知识点
-- 转换为问答形式，便于知识库查询
-
-### 4. 问题细分
-- 复杂问题拆分为多个简单问答对
-- 每个问答对聚焦一个具体知识点
-
-## 领域范围
-需要涵盖但不限于以下领域：
-
-### 产品基础信息
-- 产品介绍、功能特点、技术原理
-- 产品规格、型号、配置信息
-- 适用人群、使用场景
-
-### 使用操作
-- 开机设置、基本操作流程
-- 测量方法、注意事项
-- 数据查看、记录管理
-
-### 故障解决
-- 常见问题、故障现象
-- 解决方法、操作步骤
-- 预防措施、维护建议
-
-### 购买咨询
-- 价格信息、购买渠道
-- 优惠活动、促销政策
-- 售后服务、质保信息
-
-### 技术支持
-- 产品原理、技术细节
-- 与其他设备对比
-- 专业术语解释
+1. 基于对话事实，不得编造内容
+2. 问题表述清晰，答案准确完整
+3. 只输出有价值的问答对
 
 ## 输出格式
+直接输出问答对，每对之间用空行分隔，格式如下：
 
-请严格按照以下JSON格式输出抽取结果：
+Q: 问题内容
+A: 答案内容
 
-```json
-{
-    "qa_pairs": [
-        {
-            "question": "具体问题内容",
-            "answer": "详细答案内容",
-            "category": "问题分类",
-            "keywords": ["关键词1", "关键词2"],
-            "confidence": 0.95,
-            "source_context": "相关对话片段"
-        }
-    ],
-    "summary": {
-        "total_pairs": 5,
-        "categories": ["产品介绍", "使用操作"],
-        "extraction_notes": "抽取过程说明"
-    }
-}
-```
-
-### 字段说明
-- **question**: 标准化后的问题，清晰易懂
-- **answer**: 完整准确的答案，包含必要细节
-- **category**: 问题分类（产品介绍/使用操作/故障解决/购买咨询/技术支持）
-- **keywords**: 3-5个关键词，用于搜索和分类
-- **confidence**: 抽取置信度（0.0-1.0），建议>0.8的问答对
-- **source_context**: 原始对话中的相关片段，用于溯源
-
-## 注意事项
-
-### 质量控制
-1. **置信度要求**：只输出置信度≥0.8的问答对
-2. **去重处理**：避免重复或高度相似的问答对
-3. **完整性检查**：确保答案完整，避免截断
-4. **专业性验证**：答案应体现专业客服水准
-
-### 语言规范
-1. **标准表达**：使用规范的产品名称和术语
-2. **用户视角**：问题从用户角度表述
-3. **服务语调**：答案保持专业友好的服务语调
-4. **避免口语化**：减少"嗯"、"哦"等口语化表达
+Q: 问题内容
+A: 答案内容
 
 ## 示例
 
@@ -188,33 +94,11 @@ class QAExtractor:
 ```
 
 输出示例：
-```json
-{
-    "qa_pairs": [
-        {
-            "question": "博邦方舟无创血糖仪的工作原理是什么？",
-            "answer": "博邦方舟无创血糖仪采用先进的光谱检测技术，通过照射手指获取血糖数据，无需采血，使用非常方便。",
-            "category": "技术支持",
-            "keywords": ["工作原理", "光谱检测", "无创测量"],
-            "confidence": 0.95,
-            "source_context": "SPEAKER_01: 您好！博邦方舟无创血糖仪采用先进的光谱检测技术..."
-        },
-        {
-            "question": "博邦方舟无创血糖仪的测量准确度如何？",
-            "answer": "博邦方舟无创血糖仪准确度很高，与传统血糖仪相比，误差控制在10%以内，完全满足日常监测需求。",
-            "category": "产品介绍",
-            "keywords": ["准确度", "误差范围", "日常监测"],
-            "confidence": 0.92,
-            "source_context": "SPEAKER_01: 我们的设备准确度很高，与传统血糖仪相比..."
-        }
-    ],
-    "summary": {
-        "total_pairs": 2,
-        "categories": ["技术支持", "产品介绍"],
-        "extraction_notes": "成功抽取产品原理和准确度相关问答对"
-    }
-}
-```
+Q: 博邦方舟无创血糖仪的工作原理是什么？
+A: 博邦方舟无创血糖仪采用先进的光谱检测技术，通过照射手指获取血糖数据，无需采血，使用非常方便。
+
+Q: 博邦方舟无创血糖仪的测量准确度如何？
+A: 博邦方舟无创血糖仪准确度很高，与传统血糖仪相比，误差控制在10%以内，完全满足日常监测需求。
 
 现在请对以下清洗后的客服对话进行问答对抽取：
 
@@ -243,38 +127,19 @@ class QAExtractor:
                     {"role": "user", "content": full_prompt}
                 ],
                 temperature=0.1,  # 较低的温度确保稳定输出
-                max_tokens=4000,  # 足够的token数量
+                max_tokens=32768,  # 足够的token数量
             )
 
             result_text = response.choices[0].message.content.strip()
 
-            # 解析JSON结果
-            qa_data = self._parse_qa_response(result_text)
+            # 解析简化的QA对结果
+            qa_pairs = self._parse_simple_qa_response(result_text, source_file)
 
-            if qa_data:
-                # 创建QAPair对象
-                qa_pairs = []
-                for qa_info in qa_data.get('qa_pairs', []):
-                    qa_pair = QAPair(
-                        id=str(uuid.uuid4()),
-                        question=qa_info['question'],
-                        answer=qa_info['answer'],
-                        source_file=source_file,
-                        timestamp=datetime.now(),
-                        metadata={
-                            'category': qa_info.get('category', 'unknown'),
-                            'keywords': qa_info.get('keywords', []),
-                            'confidence': qa_info.get('confidence', 0.8),
-                            'source_context': qa_info.get('source_context', ''),
-                            'extraction_method': 'llm_auto'
-                        }
-                    )
-                    qa_pairs.append(qa_pair)
-
+            if qa_pairs:
                 return {
                     "success": True,
                     "qa_pairs": qa_pairs,
-                    "summary": qa_data.get('summary', {}),
+                    "summary": {"total_pairs": len(qa_pairs)},
                     "original_content": dialogue_content,
                     "source_file": source_file,
                     "token_usage": {
@@ -300,60 +165,85 @@ class QAExtractor:
                 "source_file": source_file
             }
 
-    def _parse_qa_response(self, response_text: str) -> Optional[Dict[str, Any]]:
+    def _parse_simple_qa_response(self, response_text: str, source_file: str = "unknown") -> List[QAPair]:
         """
-        解析LLM返回的问答对响应
+        解析简化的QA对响应
 
         Args:
             response_text: LLM响应文本
 
         Returns:
-            Dict[str, Any]: 解析后的数据，失败返回None
+            List[QAPair]: 解析后的QA对列表
         """
+        qa_pairs = []
+
         try:
-            # 尝试提取JSON部分
-            json_pattern = r'```json\n(.*?)\n```'
-            json_match = re.search(json_pattern, response_text, re.DOTALL)
+            # 按Q:和A:模式解析
+            lines = response_text.strip().split('\n')
+            current_q = None
+            current_a = None
 
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                # 如果没有找到代码块，尝试查找JSON对象
-                json_pattern = r'\{.*\}'
-                json_match = re.search(json_pattern, response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                else:
-                    self.logger.warning("无法在响应中找到JSON格式数据")
-                    return None
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
 
-            # 解析JSON
-            qa_data = json.loads(json_str)
+                if line.startswith('Q:'):
+                    # 如果有未完成的QA对，先保存
+                    if current_q and current_a:
+                        qa_pair = QAPair(
+                            id=str(uuid.uuid4()),
+                            question=current_q.strip(),
+                            answer=current_a.strip(),
+                            source_file=source_file,
+                            timestamp=datetime.now(),
+                            metadata={
+                                'category': 'unknown',
+                                'keywords': [],
+                                'confidence': 0.9,
+                                'extraction_method': 'simple_llm'
+                            }
+                        )
+                        qa_pairs.append(qa_pair)
 
-            # 验证必要字段
-            if 'qa_pairs' not in qa_data:
-                self.logger.warning("响应中缺少qa_pairs字段")
-                return None
+                    # 开始新的问题
+                    current_q = line[2:].strip()
+                    current_a = None
 
-            # 过滤低置信度的问答对
-            filtered_pairs = []
-            for qa in qa_data['qa_pairs']:
-                confidence = qa.get('confidence', 0.8)
-                if confidence >= 0.8:  # 只保留高置信度的问答对
-                    filtered_pairs.append(qa)
-                else:
-                    self.logger.info(f"过滤低置信度问答对: {confidence:.2f}")
+                elif line.startswith('A:'):
+                    # 记录答案
+                    current_a = line[2:].strip()
 
-            qa_data['qa_pairs'] = filtered_pairs
+                elif current_a is not None:
+                    # 续接答案（多行答案情况）
+                    current_a += " " + line
+                elif current_q is not None:
+                    # 续接问题（多行问题情况）
+                    current_q += " " + line
 
-            return qa_data
+            # 处理最后一个QA对
+            if current_q and current_a:
+                qa_pair = QAPair(
+                    id=str(uuid.uuid4()),
+                    question=current_q.strip(),
+                    answer=current_a.strip(),
+                    source_file=source_file,
+                    timestamp=datetime.now(),
+                    metadata={
+                        'category': 'unknown',
+                        'keywords': [],
+                        'confidence': 0.9,
+                        'extraction_method': 'simple_llm'
+                    }
+                )
+                qa_pairs.append(qa_pair)
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"JSON解析失败: {str(e)}")
-            return None
+            pass  # 静默解析QA对
+            return qa_pairs
+
         except Exception as e:
-            self.logger.error(f"响应解析失败: {str(e)}")
-            return None
+            self.logger.error(f"简化QA响应解析失败: {str(e)}")
+            return []
 
     def extract_and_save_qa_pairs(self, input_file: str) -> Dict[str, Any]:
         """

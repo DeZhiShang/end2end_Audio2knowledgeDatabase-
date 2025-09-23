@@ -58,16 +58,9 @@ class QAPair:
 
     def to_markdown(self) -> str:
         """转换为Markdown格式"""
-        metadata_str = ""
-        if self.metadata:
-            metadata_items = [f"- {k}: {v}" for k, v in self.metadata.items()]
-            metadata_str = f"\n\n**元数据:**\n" + "\n".join(metadata_items)
-
         return f"""## Q: {self.question}
 
 **A:** {self.answer}
-
-*来源: {self.source_file} | 时间: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} | ID: {self.id}*{metadata_str}
 
 ---
 """
@@ -165,8 +158,7 @@ class DualBufferKnowledgeBase:
         self._load_existing_data()
         self._load_file_status()
 
-        self.logger.info(f"双缓存知识库初始化完成，主文件: {knowledge_base_file}")
-        self.logger.info(f"当前状态 - Buffer A: {len(self.buffer_a)} pairs, Buffer B: {len(self.buffer_b)} pairs")
+        self.logger.info("知识库系统初始化完成")
 
     def _get_active_buffer(self) -> List[QAPair]:
         """获取当前活跃缓冲区"""
@@ -188,7 +180,7 @@ class DualBufferKnowledgeBase:
                 self.buffer_a = qa_pairs
                 self.stats['total_qa_pairs'] = len(qa_pairs)
 
-                self.logger.info(f"加载现有知识库数据: {len(qa_pairs)} 个问答对")
+                pass  # 静默加载知识库数据
             except Exception as e:
                 self.logger.warning(f"加载现有知识库数据失败: {str(e)}")
 
@@ -247,7 +239,7 @@ class DualBufferKnowledgeBase:
                     file_status = FileStatus.from_dict(file_data)
                     self.file_status_map[file_status.file_path] = file_status
 
-                self.logger.info(f"加载文件状态: {len(self.file_status_map)} 个文件")
+                pass  # 静默加载文件状态
             except Exception as e:
                 self.logger.warning(f"加载文件状态失败: {str(e)}")
 
@@ -285,7 +277,7 @@ class DualBufferKnowledgeBase:
             self.file_status_map[file_path] = file_status
             self._save_file_status()
 
-            self.logger.info(f"文件状态更新: {file_path} -> {status.value}")
+            pass  # 静默更新文件状态
 
     def get_file_status(self, file_path: str) -> Optional[FileStatus]:
         """
@@ -334,7 +326,7 @@ class DualBufferKnowledgeBase:
                 self.stats['active_buffer_size'] = len(active_buffer)
                 self.stats['total_qa_pairs'] += len(qa_pairs)
 
-                self.logger.info(f"成功追加 {len(qa_pairs)} 个问答对到缓冲区 {self.active_buffer}")
+                pass  # 静默追加问答对
 
                 # 根据参数决定是否自动保存到文件
                 if auto_save:
@@ -504,7 +496,7 @@ class DualBufferKnowledgeBase:
                 self.snapshot_offset = 0
                 self.current_snapshot = None
 
-                self.logger.info(f"缓冲区切换完成: {old_active} -> {self.active_buffer}")
+                pass  # 静默切换缓冲区
                 self.logger.info(f"新活跃缓冲区数据: {len(compacted_data)} 压缩 + {len(tail_data)} 尾部 = {len(new_active_buffer)} 总计")
 
                 # 保存到文件
@@ -579,7 +571,7 @@ class DualBufferKnowledgeBase:
             self._save_to_file()
             self._save_file_status()
 
-            self.logger.info("知识库资源清理完成")
+            pass  # 静默资源清理
 
         except Exception as e:
             self.logger.error(f"知识库清理失败: {str(e)}")

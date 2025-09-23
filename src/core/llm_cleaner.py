@@ -354,7 +354,7 @@ class LLMDataCleaner:
         max_rounds = max_rounds or self.max_gleaning_rounds
         quality_threshold = quality_threshold or self.quality_threshold
 
-        self.logger.info(f"开始gleaning多轮清洗 (最大{max_rounds}轮，质量阈值{quality_threshold})")
+        pass  # 静默开始多轮清洗
 
         # 存储所有轮次的结果
         rounds_results = []
@@ -363,7 +363,6 @@ class LLMDataCleaner:
 
         try:
             # 第一轮：基础清洗
-            self.logger.info("第1轮: 基础清洗...")
             first_round_result = self.clean_asr_result(current_content)
 
             if not first_round_result["success"]:
@@ -390,11 +389,8 @@ class LLMDataCleaner:
                 "evaluation": quality_eval
             })
 
-            self.logger.info(f"    💯 第1轮质量评分: {overall_score:.2f}")
-
             # 检查是否已达到质量要求
             if overall_score >= quality_threshold:
-                self.logger.info(f"  ✅ 第1轮已达到质量要求 ({overall_score:.2f} >= {quality_threshold})")
                 return {
                     "success": True,
                     "rounds": 1,
@@ -410,7 +406,7 @@ class LLMDataCleaner:
             previous_score = overall_score
 
             for round_num in range(2, max_rounds + 1):
-                self.logger.info(f"  🔍 第{round_num}轮: Gleaning优化...")
+                pass  # 静默Gleaning优化
 
                 # 使用gleaning prompt
                 gleaning_prompt = self.get_gleaning_prompt(round_num) + "\n" + current_content
@@ -443,11 +439,11 @@ class LLMDataCleaner:
                     "evaluation": quality_eval
                 })
 
-                self.logger.info(f"    💯 第{round_num}轮质量评分: {current_score:.2f} (改进: {improvement:+.3f})")
+                pass  # 静默质量评分
 
                 # 检查停止条件
                 if current_score >= quality_threshold:
-                    self.logger.info(f"  ✅ 达到质量阈值 ({current_score:.2f} >= {quality_threshold})")
+                    pass  # 静默达到质量阈值
                     return {
                         "success": True,
                         "rounds": round_num,
@@ -692,7 +688,7 @@ class LLMDataCleaner:
             }
 
         method_name = "Gleaning多轮清洗" if enable_gleaning else "标准清洗"
-        self.logger.info(f"🚀 开始批量{method_name}，发现 {len(md_files)} 个文件")
+        pass  # 静默开始批量处理
 
         # 创建输出目录
         os.makedirs(output_dir, exist_ok=True)

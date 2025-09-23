@@ -9,7 +9,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 import torchaudio
 import os
-from tqdm import tqdm
 from src.utils.logger import get_logger
 
 
@@ -81,56 +80,47 @@ class AudioSegmentation:
         segments.sort(key=lambda x: x['start_time'])
         self.logger.info(f"读取到 {len(segments)} 个音频片段，按起始时间排序", extra_data={'segment_count': len(segments)})
 
-        # 使用tqdm显示音频切分进度
+        # 切分音频片段
         segment_count = 0
-        with tqdm(segments, desc="✂️ 切分音频片段", unit="片段") as pbar:
-            for seg in pbar:
-                start_time = seg['start_time']
-                duration = seg['duration']
-                speaker_id = seg['speaker_id']
-                end_time = seg['end_time']
+        for seg in segments:
+            start_time = seg['start_time']
+            duration = seg['duration']
+            speaker_id = seg['speaker_id']
+            end_time = seg['end_time']
 
-                # 验证时间逻辑
-                if duration <= 0:
-                    self.logger.warning(f"跳过无效时长片段: {start_time:.3f}s, 时长={duration:.3f}s")
-                    continue
+            # 验证时间逻辑
+            if duration <= 0:
+                self.logger.warning(f"跳过无效时长片段: {start_time:.3f}s, 时长={duration:.3f}s")
+                continue
 
-                # 计算样本索引
-                start_sample = int(start_time * sample_rate)
-                end_sample = int(end_time * sample_rate)
+            # 计算样本索引
+            start_sample = int(start_time * sample_rate)
+            end_sample = int(end_time * sample_rate)
 
-                # 确保不超出音频长度
-                if start_sample >= waveform.shape[1]:
-                    self.logger.warning(f"跳过超出音频长度的片段: {start_time:.3f}s")
-                    continue
+            # 确保不超出音频长度
+            if start_sample >= waveform.shape[1]:
+                self.logger.warning(f"跳过超出音频长度的片段: {start_time:.3f}s")
+                continue
 
-                if end_sample > waveform.shape[1]:
-                    end_sample = waveform.shape[1]
-                    end_time = end_sample / sample_rate
+            if end_sample > waveform.shape[1]:
+                end_sample = waveform.shape[1]
+                end_time = end_sample / sample_rate
 
-                # 确保起始样本小于结束样本
-                if start_sample >= end_sample:
-                    self.logger.warning(f"跳过无效样本范围: start={start_sample}, end={end_sample}")
-                    continue
+            # 确保起始样本小于结束样本
+            if start_sample >= end_sample:
+                self.logger.warning(f"跳过无效样本范围: start={start_sample}, end={end_sample}")
+                continue
 
-                # 切分音频片段
-                segment = waveform[:, start_sample:end_sample]
+            # 切分音频片段
+            segment = waveform[:, start_sample:end_sample]
 
-                # 生成文件名：说话人-起始时间-结束时间.wav (使用序号确保有序)
-                filename = f"{segment_count:03d}_{speaker_id}-{start_time:.3f}-{end_time:.3f}.wav"
-                output_path = os.path.join(output_dir, filename)
+            # 生成文件名：说话人-起始时间-结束时间.wav (使用序号确保有序)
+            filename = f"{segment_count:03d}_{speaker_id}-{start_time:.3f}-{end_time:.3f}.wav"
+            output_path = os.path.join(output_dir, filename)
 
-                # 保存音频片段
-                torchaudio.save(output_path, segment, sample_rate)
-                segment_count += 1
-
-                # 更新进度条信息
-                pbar.set_postfix(
-                    speaker=speaker_id,
-                    start=f"{start_time:.2f}s",
-                    duration=f"{duration:.2f}s",
-                    refresh=True
-                )
+            # 保存音频片段
+            torchaudio.save(output_path, segment, sample_rate)
+            segment_count += 1
 
         self.logger.info(f"成功切分 {segment_count} 个音频片段", extra_data={'segment_count': segment_count})
         return True
