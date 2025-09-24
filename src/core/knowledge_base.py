@@ -185,46 +185,117 @@ class DualBufferKnowledgeBase:
                 self.logger.warning(f"加载现有知识库数据失败: {str(e)}")
 
     def _parse_markdown_qa_pairs(self, content: str) -> List[QAPair]:
-        """解析Markdown格式的问答对（简化实现）"""
-        # 这里是一个简化的解析实现，实际可以根据具体格式优化
+        """解析Markdown格式的问答对（支持多行答案）"""
+        import re
+
+        qa_pairs = []
+
+        try:
+            # 方案1: 使用正则表达式解析QA对，支持多行内容
+            # 匹配模式: ## Q: ... **A:** ... (直到下一个## Q:或文件结束)
+            pattern = r'## Q:\s*(.*?)\s*\*\*A:\*\*\s*(.*?)(?=\n\s*## Q:|\Z)'
+            matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
+
+            if matches:
+                for question_text, answer_text in matches:
+                    # 清理问题和答案文本
+                    question = self._clean_text(question_text)
+                    answer = self._clean_text(answer_text)
+
+                    if question and answer:  # 确保问题和答案都不为空
+                        qa_pair = QAPair(
+                            id=str(uuid.uuid4()),
+                            question=question,
+                            answer=answer,
+                            source_file="existing_data",
+                            timestamp=datetime.now(),
+                            metadata={
+                                'parsing_method': 'regex_multiline',
+                                'question_length': len(question),
+                                'answer_length': len(answer)
+                            }
+                        )
+                        qa_pairs.append(qa_pair)
+            else:
+                # 方案2: 回退到改进的逐行解析（处理格式变体）
+                qa_pairs = self._parse_markdown_line_by_line(content)
+
+        except Exception as e:
+            self.logger.warning(f"正则表达式解析失败，回退到逐行解析: {str(e)}")
+            qa_pairs = self._parse_markdown_line_by_line(content)
+
+        self.logger.info(f"成功解析 {len(qa_pairs)} 个问答对")
+        return qa_pairs
+
+    def _clean_text(self, text: str) -> str:
+        """清理文本内容，去除多余的空白符"""
+        if not text:
+            return ""
+
+        # 移除首尾空白符，规范化内部空白符
+        cleaned = ' '.join(text.strip().split())
+        return cleaned
+
+    def _parse_markdown_line_by_line(self, content: str) -> List[QAPair]:
+        """逐行解析Markdown问答对（改进版，支持多行）"""
         qa_pairs = []
         lines = content.split('\n')
 
-        current_qa = None
+        current_question = None
+        current_answer = None
+        in_answer_mode = False
         i = 0
 
         while i < len(lines):
             line = lines[i].strip()
 
-            # 检测问题行
             if line.startswith('## Q:'):
-                if current_qa:
-                    qa_pairs.append(current_qa)
-
-                question = line[5:].strip()
-
-                # 查找答案行
-                i += 1
-                while i < len(lines) and not lines[i].strip().startswith('**A:**'):
-                    i += 1
-
-                if i < len(lines):
-                    answer_line = lines[i].strip()
-                    answer = answer_line[5:].strip() if answer_line.startswith('**A:**') else ""
-
-                    # 创建问答对
-                    current_qa = QAPair(
+                # 保存前一个QA对
+                if current_question and current_answer:
+                    qa_pair = QAPair(
                         id=str(uuid.uuid4()),
-                        question=question,
-                        answer=answer,
+                        question=self._clean_text(current_question),
+                        answer=self._clean_text(current_answer),
                         source_file="existing_data",
-                        timestamp=datetime.now()
+                        timestamp=datetime.now(),
+                        metadata={'parsing_method': 'line_by_line'}
                     )
+                    qa_pairs.append(qa_pair)
+
+                # 开始新的问题
+                current_question = line[5:].strip()
+                current_answer = None
+                in_answer_mode = False
+
+            elif line.startswith('**A:**'):
+                # 开始答案收集
+                current_answer = line[5:].strip()
+                in_answer_mode = True
+
+            elif in_answer_mode and line and not line.startswith('## Q:'):
+                # 继续收集多行答案
+                if current_answer:
+                    current_answer += " " + line
+                else:
+                    current_answer = line
+
+            elif not in_answer_mode and current_question and line and not line.startswith('**A:**'):
+                # 继续收集多行问题
+                current_question += " " + line
 
             i += 1
 
-        if current_qa:
-            qa_pairs.append(current_qa)
+        # 保存最后一个QA对
+        if current_question and current_answer:
+            qa_pair = QAPair(
+                id=str(uuid.uuid4()),
+                question=self._clean_text(current_question),
+                answer=self._clean_text(current_answer),
+                source_file="existing_data",
+                timestamp=datetime.now(),
+                metadata={'parsing_method': 'line_by_line'}
+            )
+            qa_pairs.append(qa_pair)
 
         return qa_pairs
 
@@ -460,7 +531,7 @@ class DualBufferKnowledgeBase:
             with self.switch_lock:
                 # 在切换前获取当前缓冲区引用
                 current_active_buffer = self._get_active_buffer()
-                current_inactive_buffer = self._get_inactive_buffer()
+                _ = self._get_inactive_buffer()  # 保留调用但不使用变量
 
                 # 获取快照点之后的增量数据（尾部数据）
                 tail_data = current_active_buffer[self.snapshot_offset:] if self.snapshot_offset < len(current_active_buffer) else []
@@ -472,7 +543,7 @@ class DualBufferKnowledgeBase:
                     self.logger.info(f"同步尾部增量数据: {len(tail_data)} 个问答对")
 
                 # 切换活跃缓冲区指针
-                old_active = self.active_buffer
+                _ = self.active_buffer  # 保留当前值但不使用变量
                 self.active_buffer = "B" if self.active_buffer == "A" else "A"
 
                 # 现在获取新的活跃和非活跃缓冲区引用

@@ -100,7 +100,7 @@ class AudioConverter:
         # 批量转换音频文件
         for mp3_file in mp3_files:
             # 生成对应的WAV文件路径
-            filename = os.path.splitext(os.path.basename(mp3_file))[0]
+            filename = Path(mp3_file).stem
             wav_file = os.path.join(output_dir, f"{filename}.wav")
 
             # 检查WAV文件是否已存在

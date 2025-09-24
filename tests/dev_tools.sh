@@ -100,7 +100,7 @@ rename_mp3_files() {
     cd "$PROJECT_ROOT"
 
     # 定义MP3文件目录
-    MP3_DIR="data/input/mp3s"
+    MP3_DIR="data/input/batch_2"
 
     # 检查目录是否存在
     if [ ! -d "$MP3_DIR" ]; then

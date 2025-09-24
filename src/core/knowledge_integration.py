@@ -166,7 +166,7 @@ class KnowledgeProcessor:
                 }
 
             # 执行问答对抽取
-            self.logger.info(f"开始处理文件: {os.path.basename(file_path)}")
+            self.logger.info(f"开始抽取文件: {os.path.basename(file_path)}")
             extraction_result = self.qa_extractor.extract_and_save_qa_pairs(file_path)
 
             # 更新统计信息
@@ -178,7 +178,7 @@ class KnowledgeProcessor:
                 self.processing_stats['qa_extraction_success'] += 1
                 self.processing_stats['total_qa_pairs_extracted'] += qa_count
 
-                self.logger.info(f"✅ 文件处理成功: {os.path.basename(file_path)}, 抽取 {qa_count} 个问答对")
+                self.logger.info(f"✅ 文件抽取成功: {os.path.basename(file_path)}, 抽取 {qa_count} 个问答对")
 
                 # 检查是否需要初始化压缩器
                 if self.enable_auto_compaction and self.qa_compactor is None:

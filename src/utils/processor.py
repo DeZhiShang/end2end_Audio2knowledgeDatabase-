@@ -245,7 +245,7 @@ class AudioProcessor:
             self.logger.error(f"处理 {wav_file} 时出错: {str(e)}", extra_data={'file': wav_file, 'error': str(e)})
             return "error"
 
-    def convert_mp3_to_wav(self, input_dir="data/input/mp3s", output_dir="data/processed/wavs"):
+    def convert_mp3_to_wav(self, input_dir="data/input/batch_2", output_dir="data/processed/wavs"):
         """
         批量转换MP3文件为WAV格式
 
