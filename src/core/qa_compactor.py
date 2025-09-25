@@ -29,6 +29,13 @@ except ImportError:
     def load_dotenv():
         pass
 
+try:
+    from src.core.embedding_similarity import get_embedding_similarity_calculator, EmbeddingPrefilter
+except ImportError as e:
+    print(f"警告: embedding模块导入失败: {e}")
+    get_embedding_similarity_calculator = None
+    EmbeddingPrefilter = None
+
 # 加载环境变量
 load_dotenv()
 
@@ -60,9 +67,15 @@ class QASimilarityAnalyzer:
 
         self.model_name = "qwen-plus-latest"
 
-        # 批处理配置（已改为全量处理模式）
-        self.batch_size = 1000  # 支持大批量问答对全量处理
+        # 智能批处理配置
+        self.batch_size = 50  # 单批次最佳大小（经优化后的小批次）
+        self.max_full_context_size = 100  # 全量分析的最大规模
+        self.enable_embedding_prefilter = True  # 启用embedding预筛选
         self.similarity_cache = {}  # 相似度缓存
+
+        # 初始化embedding组件
+        self.embedding_calc = None
+        self.prefilter = None
 
     def get_similarity_prompt(self) -> str:
         """
@@ -202,10 +215,7 @@ GROUP: 0,1
                         if len(indices) >= 2:  # 至少2个QA对才能成组
                             similar_groups.append({
                                 "group_id": len(similar_groups) + 1,
-                                "qa_indices": indices,
-                                "group_similarity": 0.8,  # 简化处理，给个默认值
-                                "merge_feasibility": "high",
-                                "merge_strategy": "基于LLM判断的相似组"
+                                "qa_indices": indices
                             })
                             processed_indices.update(indices)
                     except ValueError:
@@ -283,10 +293,7 @@ GROUP: 0,1
             if len(current_group) > 1:
                 similar_groups.append({
                     "group_id": len(similar_groups) + 1,
-                    "qa_indices": current_group,
-                    "group_similarity": 0.8,  # 简化处理
-                    "merge_feasibility": "high",
-                    "merge_strategy": "使用传统合并策略"
+                    "qa_indices": current_group
                 })
 
         independent_qa = [i for i in range(len(qa_pairs)) if i not in processed]
@@ -348,6 +355,22 @@ GROUP: 0,1
 
         return min(semantic_similarity, 1.0)
 
+    def _initialize_advanced_components(self):
+        """初始化高级组件（embedding）"""
+        try:
+            if get_embedding_similarity_calculator and EmbeddingPrefilter:
+                self.embedding_calc = get_embedding_similarity_calculator()
+                self.prefilter = EmbeddingPrefilter(self.embedding_calc)
+                self.logger.info("✅ Embedding预筛选器初始化成功")
+            else:
+                self.logger.warning("⚠️ Embedding组件不可用，将使用传统方法")
+
+
+        except Exception as e:
+            self.logger.error(f"高级组件初始化失败: {str(e)}，将使用传统方法")
+            self.embedding_calc = None
+            self.prefilter = None
+
     def find_similar_groups(self, qa_pairs: List[QAPair], similarity_threshold: float = 0.75, use_llm: bool = True) -> List[List[QAPair]]:
         """
         将相似的问答对分组 - 支持LLM和传统算法
@@ -368,9 +391,15 @@ GROUP: 0,1
 
         try:
             if use_llm:
-                # 全量LLM处理模式 - 不再分批，让LLM一次性分析所有问答对
-                self.logger.info(f"使用LLM全量分析模式处理 {len(qa_pairs)} 个问答对")
-                return self._find_similar_groups_llm(qa_pairs, similarity_threshold)
+                # 智能分批压缩策略
+                if len(qa_pairs) <= self.max_full_context_size:
+                    # 数量较少，使用全量LLM分析
+                    self.logger.info(f"使用LLM全量分析模式处理 {len(qa_pairs)} 个问答对")
+                    return self._find_similar_groups_llm(qa_pairs, similarity_threshold)
+                else:
+                    # 数量较多，使用embedding预筛选+分批LLM分析
+                    self.logger.info(f"使用智能分批压缩策略处理 {len(qa_pairs)} 个问答对")
+                    return self._find_similar_groups_batch_optimized(qa_pairs, similarity_threshold)
             else:
                 return self._find_similar_groups_traditional(qa_pairs, similarity_threshold)
 
@@ -406,17 +435,14 @@ GROUP: 0,1
         # 处理相似组
         for group_data in similar_groups_data:
             qa_indices = group_data.get('qa_indices', [])
-            group_similarity = group_data.get('group_similarity', 0.0)
-            merge_feasibility = group_data.get('merge_feasibility', 'low')
 
-            # 根据相似度和可行性判断是否分组
-            if group_similarity >= similarity_threshold and merge_feasibility in ['high', 'medium']:
-                group = [qa_pairs[i] for i in qa_indices if 0 <= i < len(qa_pairs)]
-                if len(group) > 1:
-                    groups.append(group)
-                    # 从独立列表中移除
-                    for i in qa_indices:
-                        independent_qa_indices.discard(i)
+            # LLM输出GROUP即表示可合并，直接处理
+            group = [qa_pairs[i] for i in qa_indices if 0 <= i < len(qa_pairs)]
+            if len(group) > 1:
+                groups.append(group)
+                # 从独立列表中移除
+                for i in qa_indices:
+                    independent_qa_indices.discard(i)
 
         # 处理独立问答对
         for i in independent_qa_indices:
@@ -442,6 +468,134 @@ GROUP: 0,1
         self.logger.info(f"LLM相似性分析完成: {len(similar_groups)} 个需要合并的组, {len(single_groups)} 个独立问答对")
 
         return similar_groups + single_groups
+
+    def _find_similar_groups_batch_optimized(self, qa_pairs: List[QAPair], similarity_threshold: float) -> List[List[QAPair]]:
+        """
+        优化的分批相似度分组 - 使用embedding预筛选+LLM精确分析
+
+        Args:
+            qa_pairs: 问答对列表
+            similarity_threshold: 相似度阈值
+
+        Returns:
+            List[List[QAPair]]: 相似问答对分组
+        """
+        self.logger.info(f"开始优化分批分组: {len(qa_pairs)} 个问答对")
+
+        # Step 1: Embedding预筛选（如果可用）
+        if self.prefilter and self.enable_embedding_prefilter:
+            batches = self.prefilter.prefilter_for_llm(qa_pairs, self.batch_size)
+            self.logger.info(f"Embedding预筛选完成: 生成 {len(batches)} 个优化批次")
+        else:
+            # 降级到简单分批
+            self.logger.warning("Embedding预筛选不可用，使用简单分批")
+            batches = [qa_pairs[i:i + self.batch_size] for i in range(0, len(qa_pairs), self.batch_size)]
+
+        # Step 2: 分批LLM分析
+        all_groups = []
+        processed_qa_ids = set()
+
+        for batch_idx, batch_qa_pairs in enumerate(batches):
+            # 过滤已处理的问答对
+            batch_qa_pairs = [qa for qa in batch_qa_pairs if qa.id not in processed_qa_ids]
+
+            if not batch_qa_pairs:
+                continue
+
+            self.logger.info(f"处理批次 {batch_idx + 1}/{len(batches)}: {len(batch_qa_pairs)} 个问答对")
+
+            try:
+                # 对当前批次进行LLM分组
+                batch_groups = self._find_similar_groups_llm(batch_qa_pairs, similarity_threshold)
+
+                # Step 3: 使用基础分组结果
+
+                # 收集结果
+                for group in batch_groups:
+                    all_groups.append(group)
+                    for qa in group:
+                        processed_qa_ids.add(qa.id)
+
+            except Exception as e:
+                self.logger.warning(f"批次 {batch_idx + 1} LLM分组失败: {str(e)}，使用传统方法")
+                batch_groups = self._find_similar_groups_traditional(batch_qa_pairs, similarity_threshold)
+                for group in batch_groups:
+                    all_groups.append(group)
+                    for qa in group:
+                        processed_qa_ids.add(qa.id)
+
+        # Step 4: 跨批次后处理（使用基础方法）
+        if len(all_groups) > 1:
+            all_groups = self._merge_similar_groups_basic(all_groups, similarity_threshold)
+
+        # 统计结果
+        similar_groups = [group for group in all_groups if len(group) > 1]
+        single_groups = [group for group in all_groups if len(group) == 1]
+
+        self.logger.info(f"优化分批分组完成: {len(similar_groups)} 个多元素组 + {len(single_groups)} 个独立问答对")
+
+        return similar_groups + single_groups
+
+    def _optimize_cross_batch_groups(self, groups: List[List[QAPair]], similarity_threshold: float) -> List[List[QAPair]]:
+        """
+        跨批次组优化 - 使用embedding快速检测可能的跨批次相似性
+
+        Args:
+            groups: 分组列表
+            similarity_threshold: 相似度阈值
+
+        Returns:
+            List[List[QAPair]]: 优化后的分组列表
+        """
+        if not self.embedding_calc:
+            return groups
+
+        self.logger.info(f"开始跨批次优化: {len(groups)} 个组")
+
+        # 只对多元素组进行跨批次检查（单元素组跨批次合并的可能性很小）
+        multi_element_groups = [group for group in groups if len(group) > 1]
+        single_element_groups = [group for group in groups if len(group) == 1]
+
+        if len(multi_element_groups) <= 1:
+            return groups
+
+        optimized_groups = []
+        processed_group_indices = set()
+
+        for i, group1 in enumerate(multi_element_groups):
+            if i in processed_group_indices:
+                continue
+
+            current_merged_group = group1[:]
+            processed_group_indices.add(i)
+
+            # 选择组内第一个作为代表
+            rep1 = group1[0]
+
+            for j, group2 in enumerate(multi_element_groups[i+1:], i+1):
+                if j in processed_group_indices:
+                    continue
+
+                rep2 = group2[0]
+
+                # 使用embedding快速检测相似性
+                similarity = self.embedding_calc.calculate_similarity(rep1, rep2)
+
+                if similarity and similarity >= similarity_threshold:
+                    # 找到潜在相似组，进行更细致的检查
+                    # 基于embedding相似度进行跨组合并
+                    current_merged_group.extend(group2)
+                    processed_group_indices.add(j)
+                    self.logger.info(f"跨批次合并: 组{i+1} + 组{j+1}")
+
+            optimized_groups.append(current_merged_group)
+
+        # 添加单元素组
+        optimized_groups.extend(single_element_groups)
+
+        self.logger.info(f"跨批次优化完成: {len(groups)} → {len(optimized_groups)} 个组")
+
+        return optimized_groups
 
     def _find_similar_groups_batch_llm(self, qa_pairs: List[QAPair], similarity_threshold: float) -> List[List[QAPair]]:
         """
@@ -609,6 +763,13 @@ class QACompactor:
         # 相似性分析器
         self.similarity_analyzer = QASimilarityAnalyzer()
 
+        # 压缩配置参数
+        self.max_full_context_size = 100  # 全量分析的最大规模
+        self.batch_size = 50  # 单批次最佳大小
+
+        # 初始化高级组件（embedding）
+        self._initialize_advanced_components()
+
         # 压缩统计
         self.compaction_stats = {
             'total_compactions': 0,
@@ -618,6 +779,22 @@ class QACompactor:
             'compression_ratio': 0.0,
             'last_compaction_time': None
         }
+
+    def _initialize_advanced_components(self):
+        """初始化高级组件（embedding）"""
+        try:
+            if get_embedding_similarity_calculator and EmbeddingPrefilter:
+                self.embedding_calc = get_embedding_similarity_calculator()
+                self.prefilter = EmbeddingPrefilter(self.embedding_calc)
+                self.logger.info("✅ Embedding预筛选器初始化成功")
+            else:
+                self.logger.warning("⚠️ Embedding组件不可用，将使用传统方法")
+
+
+        except Exception as e:
+            self.logger.error(f"高级组件初始化失败: {str(e)}，将使用传统方法")
+            self.embedding_calc = None
+            self.prefilter = None
 
     def get_merge_prompt(self) -> str:
         """
@@ -847,8 +1024,21 @@ A: 博邦方舟无创血糖仪的使用非常简单：
         start_time = datetime.now()
         original_count = len(qa_pairs)
 
-        similarity_method = "LLM智能检验" if use_llm_similarity else "传统算法"
+        # 确定使用的方法
+        if use_llm_similarity and original_count > self.max_full_context_size and self.prefilter:
+            similarity_method = "Embedding预筛选+LLM分批智能检验"
+        elif use_llm_similarity:
+            similarity_method = "LLM全量智能检验"
+        else:
+            similarity_method = "传统算法"
+
         self.logger.info(f"开始压缩 {original_count} 个问答对，使用 {similarity_method} 进行相似度检验...")
+
+        # 输出优化组件状态
+        if self.embedding_calc:
+            self.logger.info("🎯 Embedding相似度计算: 已启用")
+        if self.prefilter:
+            self.logger.info("🔍 Embedding预筛选: 已启用")
 
         try:
             # 第一步：移除完全重复的问答对
@@ -896,7 +1086,9 @@ A: 博邦方舟无创血糖仪的使用非常简单：
                 'compression_ratio': compression_ratio,
                 'last_compaction_time': datetime.now().isoformat(),
                 'similarity_method': similarity_method,
-                'llm_similarity_enabled': use_llm_similarity
+                'llm_similarity_enabled': use_llm_similarity,
+                'embedding_enabled': self.embedding_calc is not None,
+                'batch_optimization_enabled': len(qa_pairs) > self.max_full_context_size and self.prefilter is not None
             })
 
             self.logger.info(f"压缩完成！")
@@ -1012,7 +1204,7 @@ class CompactionScheduler:
         """检查并执行压缩"""
         try:
             from src.core.knowledge_base import get_knowledge_base
-            from datetime import datetime, timedelta
+            from datetime import datetime
 
             self.compaction_attempts += 1
             self.last_compaction_attempt = datetime.now()

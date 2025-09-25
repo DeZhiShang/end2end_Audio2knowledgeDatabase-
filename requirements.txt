@@ -26,5 +26,8 @@ glob2>=0.7
 openai>=1.0.0
 python-dotenv>=1.0.0
 
+# 机器学习和聚类
+scikit-learn>=1.0.0
+
 # 系统监控
 psutil>=5.9.0
