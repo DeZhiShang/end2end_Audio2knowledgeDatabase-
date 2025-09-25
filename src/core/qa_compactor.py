@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
 import threading
+from src.core.prompt import get_similarity_prompt, get_merge_prompt
 
 try:
     import openai
@@ -77,64 +78,6 @@ class QASimilarityAnalyzer:
         self.embedding_calc = None
         self.prefilter = None
 
-    def get_similarity_prompt(self) -> str:
-        """
-        获取LLM相似度检验的prompt模板
-
-        Returns:
-            str: 相似度检验prompt模板
-        """
-        prompt = """你是一个专业的知识库内容分析专家，负责判断博邦方舟无创血糖仪知识库中问答对的相似性。  
-
-## 任务目标  
-分析问答对的相似性，判断它们是否可以合并。注意可能问题  
-
-## 相似性判断标准  
-- 高相似性（可合并）：  
-  - 问题表达方式不同，但核心意图相同  
-  - 答案内容相同或仅在表述、细节程度上不同（如一个更简洁，一个更详细）  
-- 低相似性（不可合并）：  
-  - 问题意图不同  
-  - 答案包含差异性信息（如数值不同、条件不同、场景不同）  
-
-遇到边界情况时：  
-- 如果答案差异不影响核心含义 → 合并  
-- 如果答案差异可能导致用户得到不同结论 → 不合并  
-
-## 输出格式  
-- 只输出分组结果，每个相似QA对组一行  
-- 格式：  
-  GROUP: QA编号1,QA编号2,QA编号3  
-- 独立QA对不输出任何内容  
-- 不要输出解释或分析  
-
-## 注意事项
-- 给出的QA列可能有多个相似GROUP，注意甄别，别只合并成一个GROUP。多个相似组使用不同的行输出
-- 示例仅仅是给你一个简要的示例，并不代表其中信息是正确的，一切的信息来源都基于实际提供的问答对
-
-## 示例  
-
-输入QA对：  
-0. Q: 博邦方舟血糖仪怎么使用？  
-   A: 使用很简单，开机后把手指放在测量区域就可以了  
-
-1. Q: 无创血糖仪的操作步骤是什么？  
-   A: 首先开机，然后将手指置于检测区，等待测量结果显示  
-
-2. Q: 设备的价格是多少？  
-   A: 具体价格请咨询客服或查看官网信息
-
-3. Q：你们这东西多少钱呀
-   A：个人版2199元，家庭版2999元
-
-输出示例：  
-GROUP: 0,1  
-GROUP：2,3
-
-现在请分析以下真实问答对的相似性：
-
-"""
-        return prompt
 
     def calculate_llm_similarity_batch(self, qa_pairs: List[QAPair]) -> Dict[str, Any]:
         """
@@ -169,7 +112,7 @@ GROUP：2,3
                 qa_text += f"   A: {qa.answer}\n\n"
 
             # 构建完整的prompt
-            full_prompt = self.get_similarity_prompt() + "\n" + qa_text
+            full_prompt = get_similarity_prompt() + "\n" + qa_text
 
             # 调用LLM API
             response = self.client.chat.completions.create(
@@ -804,64 +747,6 @@ class QACompactor:
             self.embedding_calc = None
             self.prefilter = None
 
-    def get_merge_prompt(self) -> str:
-        """
-        获取问答对合并的prompt模板
-
-        Returns:
-            str: 合并prompt模板
-        """
-        prompt = """你是一个专业的知识库优化专家，负责合并博邦方舟无创血糖仪知识库中的相似问答对。  
-
-## 任务目标  
-将多个相似的问答对合并为一个高质量的问答对。  
-
-## 合并原则  
-1. 信息完整：合并后的答案必须涵盖原问答对中的所有有效信息，不得遗漏。  
-2. 去除冗余：删除重复或表达方式不同但语义相同的内容。  
-3. 基于语义合并：不要简单拼接多个答案，而是理解它们的语义，将信息整合、重写为一段自然流畅的专业回答。  
-4. 语言优化：问题合并时选择最清晰、最标准的提问方式；答案表述应逻辑清晰，可以分点说明，增强可读性。  
-5. 忠实原文：不得编造新信息，不得修改事实。  
-
-## 输出格式  
-直接输出合并后的QA对，格式如下：  
-Q: 合并后的问题  
-A: 合并后的答案  
-
-## 示例  
-
-输入相似问答对：
-```
-Q: 博邦方舟血糖仪怎么使用？
-A: 使用很简单，开机后把手指放在测量区域就可以了
-
-Q: 无创血糖仪的操作步骤是什么？
-A: 首先开机，然后将手指置于检测区，等待测量结果显示
-```
-
-输出合并结果（语义合并后）：  
-Q: 博邦方舟无创血糖仪的使用方法和操作步骤是什么？  
-A: 博邦方舟无创血糖仪的使用非常简单：  
-1. 开机启动设备；  
-2. 将手指放置在测量检测区域；  
-3. 等待设备自动完成测量并显示结果。  
-整个过程无需采血，操作便捷，适合日常血糖监测。  
-
-现在请对以下相似问答对进行合并： 
-
-"""
-        return prompt
-
-    def merge_similar_qa_pairs(self, similar_qa_pairs: List[QAPair]) -> Optional[QAPair]:
-        """
-        合并相似的问答对
-
-        Args:
-            similar_qa_pairs: 相似问答对列表
-
-        Returns:
-            QAPair: 合并后的问答对，失败返回None
-        """
         if len(similar_qa_pairs) <= 1:
             return similar_qa_pairs[0] if similar_qa_pairs else None
 
@@ -873,7 +758,7 @@ A: 博邦方舟无创血糖仪的使用非常简单：
                 qa_text += f"A: {qa.answer}\n\n"
 
             # 构建完整的prompt
-            full_prompt = self.get_merge_prompt() + "\n" + qa_text
+            full_prompt = get_merge_prompt() + "\n" + qa_text
 
             # 调用LLM API
             response = self.client.chat.completions.create(
