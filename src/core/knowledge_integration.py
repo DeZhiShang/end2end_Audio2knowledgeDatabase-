@@ -408,24 +408,163 @@ class KnowledgeProcessor:
                 }
             }
 
+    def _perform_final_compaction(self) -> Dict[str, Any]:
+        """
+        执行最终压缩操作
+        在系统关闭前确保所有数据都经过压缩优化
+
+        Returns:
+            Dict[str, Any]: 压缩结果
+        """
+        try:
+            self.logger.info("🔄 开始执行最终压缩检查...")
+
+            # 初始化压缩器（如果尚未初始化）
+            self._initialize_qa_compactor()
+            if not self.qa_compactor or self.qa_compactor is False:
+                self.logger.info("压缩器不可用，跳过最终压缩")
+                return {
+                    "success": False,
+                    "reason": "compactor_unavailable",
+                    "message": "压缩器不可用"
+                }
+
+            # 获取知识库统计信息
+            kb_stats = self.knowledge_base.get_statistics()
+            total_qa_pairs = kb_stats.get('total_qa_pairs', 0)
+            active_buffer_size = kb_stats.get('active_buffer_size', 0)
+
+            self.logger.info(f"知识库状态: 总计{total_qa_pairs}个问答对, 活跃缓冲区{active_buffer_size}个")
+
+            # 使用更宽松的最终压缩条件
+            final_compression_threshold = 5  # 最终压缩的最小阈值
+
+            if total_qa_pairs < final_compression_threshold:
+                self.logger.info(f"问答对数量不足({total_qa_pairs} < {final_compression_threshold})，跳过最终压缩")
+                return {
+                    "success": False,
+                    "reason": "insufficient_data",
+                    "message": f"问答对数量不足: {total_qa_pairs}"
+                }
+
+            # 检查活跃缓冲区是否有数据需要压缩
+            if active_buffer_size == 0:
+                self.logger.info("活跃缓冲区为空，无需最终压缩")
+                return {
+                    "success": False,
+                    "reason": "no_active_data",
+                    "message": "活跃缓冲区为空"
+                }
+
+            self.logger.info(f"✅ 满足最终压缩条件，开始压缩 {total_qa_pairs} 个问答对...")
+
+            # 创建快照
+            snapshot = self.knowledge_base.create_snapshot()
+            if not snapshot:
+                self.logger.error("创建快照失败，最终压缩中止")
+                return {
+                    "success": False,
+                    "reason": "snapshot_failed",
+                    "error": "创建快照失败"
+                }
+
+            # 执行压缩（使用LLM智能检验，适中的相似度阈值）
+            self.logger.info("正在执行最终压缩...")
+            compaction_result = self.qa_compactor.compact_qa_pairs(
+                snapshot.data,
+                similarity_threshold=0.7,  # 稍微宽松的阈值，确保更好的压缩效果
+                use_llm_similarity=True
+            )
+
+            if compaction_result["success"]:
+                # 切换缓冲区并同步尾部数据
+                compacted_qa_pairs = compaction_result["compacted_qa_pairs"]
+                switch_success = self.knowledge_base.switch_buffers_with_tail_sync(compacted_qa_pairs)
+
+                if switch_success:
+                    compression_ratio = compaction_result["compression_ratio"]
+                    original_count = compaction_result["original_count"]
+                    final_count = compaction_result["final_count"]
+
+                    self.logger.info(f"🎉 最终压缩完成！")
+                    self.logger.info(f"📊 压缩统计: {original_count} → {final_count} ({compression_ratio:.2%} 压缩率)")
+
+                    return {
+                        "success": True,
+                        "original_count": original_count,
+                        "final_count": final_count,
+                        "compression_ratio": compression_ratio,
+                        "processing_time": compaction_result["processing_time"]
+                    }
+                else:
+                    self.logger.error("最终压缩的缓冲区切换失败")
+                    return {
+                        "success": False,
+                        "reason": "buffer_switch_failed",
+                        "error": "缓冲区切换失败"
+                    }
+            else:
+                error_msg = compaction_result.get("error", "未知压缩错误")
+                self.logger.warning(f"最终压缩失败: {error_msg}")
+                return {
+                    "success": False,
+                    "reason": "compression_failed",
+                    "error": error_msg
+                }
+
+        except Exception as e:
+            self.logger.error(f"最终压缩过程异常: {str(e)}")
+            return {
+                "success": False,
+                "reason": "exception",
+                "error": str(e)
+            }
+
     def shutdown(self):
         """关闭知识处理器，清理资源"""
         try:
+            # 执行最终压缩（在停止调度器之前）
+            if self.enable_auto_compaction:
+                self.logger.info("=" * 60)
+                self.logger.info("🔄 执行最终压缩流程")
+                self.logger.info("=" * 60)
+
+                final_compression_result = self._perform_final_compaction()
+
+                if final_compression_result["success"]:
+                    self.logger.info("✅ 最终压缩成功完成")
+                else:
+                    reason = final_compression_result.get("reason", "unknown")
+                    if reason in ["insufficient_data", "no_active_data", "compactor_unavailable"]:
+                        self.logger.info(f"ℹ️ 跳过最终压缩: {final_compression_result.get('message', reason)}")
+                    else:
+                        self.logger.warning(f"⚠️ 最终压缩未成功: {final_compression_result.get('error', reason)}")
+                        self.logger.info("数据将正常保存，不受压缩影响")
+
             # 停止压缩调度器
             if self.compaction_scheduler:
+                self.logger.info("停止压缩调度器...")
                 self.compaction_scheduler.stop_scheduler()
 
             # 停止系统监控
             if self.system_monitor:
+                self.logger.info("停止系统监控...")
                 self.system_monitor.stop_monitoring()
 
-            # 清理知识库
+            # 清理知识库（保存最终数据）
+            self.logger.info("保存知识库数据...")
             self.knowledge_base.cleanup()
 
-            self.logger.info("知识处理器已关闭")
+            self.logger.info("✅ 知识处理器已安全关闭")
 
         except Exception as e:
-            self.logger.error(f"知识处理器关闭失败: {str(e)}")
+            self.logger.error(f"❌ 知识处理器关闭失败: {str(e)}")
+            # 确保即使出现异常，知识库数据也能保存
+            try:
+                self.knowledge_base.cleanup()
+                self.logger.info("紧急保存知识库数据完成")
+            except Exception as cleanup_e:
+                self.logger.error(f"紧急保存也失败: {str(cleanup_e)}")
 
 
 # 全局知识处理器实例
