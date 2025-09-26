@@ -78,6 +78,9 @@ class QASimilarityAnalyzer:
         self.embedding_calc = None
         self.prefilter = None
 
+        # 初始化高级组件（embedding预筛选）
+        self._initialize_advanced_components()
+
 
     def calculate_llm_similarity_batch(self, qa_pairs: List[QAPair]) -> Dict[str, Any]:
         """
@@ -475,9 +478,9 @@ class QASimilarityAnalyzer:
                     for qa in group:
                         processed_qa_ids.add(qa.id)
 
-        # Step 4: 跨批次后处理（使用基础方法）
+        # Step 4: 跨批次后处理（使用现有方法）
         if len(all_groups) > 1:
-            all_groups = self._merge_similar_groups_basic(all_groups, similarity_threshold)
+            all_groups = self._merge_cross_batch_groups(all_groups, similarity_threshold)
 
         # 统计结果
         similar_groups = [group for group in all_groups if len(group) > 1]
@@ -740,13 +743,24 @@ class QACompactor:
                 self.logger.info("✅ Embedding预筛选器初始化成功")
             else:
                 self.logger.warning("⚠️ Embedding组件不可用，将使用传统方法")
-
+                self.embedding_calc = None
+                self.prefilter = None
 
         except Exception as e:
             self.logger.error(f"高级组件初始化失败: {str(e)}，将使用传统方法")
             self.embedding_calc = None
             self.prefilter = None
 
+    def merge_similar_qa_pairs(self, similar_qa_pairs: List[QAPair]) -> Optional[QAPair]:
+        """
+        合并相似的问答对
+
+        Args:
+            similar_qa_pairs: 相似问答对列表
+
+        Returns:
+            Optional[QAPair]: 合并后的问答对，失败返回None
+        """
         if len(similar_qa_pairs) <= 1:
             return similar_qa_pairs[0] if similar_qa_pairs else None
 

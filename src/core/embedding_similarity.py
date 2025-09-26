@@ -58,12 +58,12 @@ class EmbeddingSimilarityCalculator:
         self.low_similarity_threshold = 0.65  # 低相似度
 
         # 并行处理参数
-        self.parallel_batch_size = 50  # 并行处理的批次大小，避免embedding上下文过长
+        self.parallel_batch_size = 35  # 并行处理的批次大小，基于16384上下文和200tokens/QA优化
         self.max_workers = 4  # 最大并行工作线程数
 
         # Token预估 (每个中文字符约1.3个token)
-        self.avg_qa_tokens = 40  # 平均每个QA对的token数
-        self.embedding_context_limit = 8000  # embedding模型上下文限制的保守估计
+        self.avg_qa_tokens = 200  # 平均每个QA对的token数（基于实际数据调整）
+        self.embedding_context_limit = 16384  # embedding模型上下文限制
 
     def get_embeddings_batch(self, texts: List[str], max_retries: int = 3) -> List[Optional[np.ndarray]]:
         """
@@ -186,7 +186,7 @@ class EmbeddingSimilarityCalculator:
 
         return None
 
-    def get_qa_embeddings_batch_parallel(self, qa_pairs: List[QAPair], batch_size: int = 50, max_workers: int = 4) -> Dict[str, EmbeddingCache]:
+    def get_qa_embeddings_batch_parallel(self, qa_pairs: List[QAPair], batch_size: int = 35, max_workers: int = 4) -> Dict[str, EmbeddingCache]:
         """
         并行分批获取问答对的向量表示 - 解决长上下文问题
 
@@ -310,7 +310,7 @@ class EmbeddingSimilarityCalculator:
 
         return batch_results
 
-    def get_qa_embeddings_batch(self, qa_pairs: List[QAPair], batch_size: int = 100) -> Dict[str, EmbeddingCache]:
+    def get_qa_embeddings_batch(self, qa_pairs: List[QAPair], batch_size: int = 35) -> Dict[str, EmbeddingCache]:
         """
         批量获取问答对的向量表示（带缓存）
 
@@ -601,7 +601,7 @@ class EmbeddingPrefilter:
         self.logger = get_logger(__name__)
         self.similarity_calc = similarity_calculator
 
-    def prefilter_for_llm(self, qa_pairs: List[QAPair], batch_size: int = 50) -> List[List[QAPair]]:
+    def prefilter_for_llm(self, qa_pairs: List[QAPair], batch_size: int = 35) -> List[List[QAPair]]:
         """
         为LLM分析预筛选相似问答对
 
