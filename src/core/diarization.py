@@ -46,7 +46,7 @@ class SpeakerDiarization:
 
         self.pipeline = Pipeline.from_pretrained(
             model_name,
-            use_auth_token=auth_token
+            # use_auth_token=auth_token
         )
         self.pipeline.to(torch.device(device))
         self.logger.info(f"说话人分离模型已加载到 {device}", extra_data={'device': device, 'model': model_name})
