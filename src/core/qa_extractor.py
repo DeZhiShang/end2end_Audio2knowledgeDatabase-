@@ -29,13 +29,20 @@ load_dotenv()
 
 from src.utils.logger import get_logger
 from src.core.knowledge_base import QAPair, get_knowledge_base
+from src.utils.file_cleaner import get_file_cleaner
 
 
 class QAExtractor:
     """问答对抽取器：从清洗后的对话中提取问答对"""
 
-    def __init__(self):
-        """初始化问答对抽取器"""
+    def __init__(self, enable_auto_cleanup: bool = True, cleanup_dry_run: bool = False):
+        """
+        初始化问答对抽取器
+
+        Args:
+            enable_auto_cleanup: 是否启用自动清理中间文件
+            cleanup_dry_run: 是否为清理干运行模式
+        """
         self.logger = get_logger(__name__)
 
         if openai is None:
@@ -58,6 +65,68 @@ class QAExtractor:
         # 获取知识库实例
         self.knowledge_base = get_knowledge_base()
 
+        # 文件清理器配置
+        self.enable_auto_cleanup = enable_auto_cleanup
+        self.cleanup_dry_run = cleanup_dry_run
+        self.file_cleaner = None  # 延迟初始化
+
+    def _initialize_file_cleaner(self):
+        """延迟初始化文件清理器"""
+        if self.file_cleaner is None and self.enable_auto_cleanup:
+            try:
+                self.file_cleaner = get_file_cleaner(
+                    enable_cleanup=self.enable_auto_cleanup,
+                    dry_run=self.cleanup_dry_run
+                )
+                mode_desc = "干运行模式" if self.cleanup_dry_run else "实际删除模式"
+                self.logger.info(f"文件清理器初始化成功 ({mode_desc})")
+            except Exception as e:
+                self.logger.warning(f"文件清理器初始化失败: {str(e)}")
+                self.file_cleaner = False  # 标记为失败
+
+    def _trigger_file_cleanup(self, file_path: str) -> Dict[str, Any]:
+        """
+        触发文件清理
+
+        Args:
+            file_path: 触发清理的文件路径
+
+        Returns:
+            Dict[str, Any]: 清理结果
+        """
+        if not self.enable_auto_cleanup:
+            return {
+                "success": False,
+                "message": "文件清理已禁用"
+            }
+
+        # 初始化清理器
+        self._initialize_file_cleaner()
+        if not self.file_cleaner or self.file_cleaner is False:
+            return {
+                "success": False,
+                "error": "文件清理器不可用"
+            }
+
+        # 执行清理
+        try:
+            cleanup_result = self.file_cleaner.cleanup_intermediate_files(file_path)
+
+            if cleanup_result["success"]:
+                action_desc = "DRY-RUN清理" if self.cleanup_dry_run else "清理"
+                self.logger.info(f"🧹 {action_desc}中间文件成功: {cleanup_result.get('file_number', 'unknown')}, "
+                               f"释放空间: {cleanup_result.get('disk_space_freed', 0):.2f}MB")
+            else:
+                self.logger.warning(f"清理中间文件失败: {cleanup_result.get('error', '未知错误')}")
+
+            return cleanup_result
+
+        except Exception as e:
+            self.logger.error(f"文件清理异常: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def extract_qa_pairs_from_text(self, dialogue_content: str, source_file: str = "unknown") -> Dict[str, Any]:
         """
@@ -247,6 +316,14 @@ class QAExtractor:
                         )
 
                         self.logger.info(f"✅ 成功抽取并保存 {len(qa_pairs)} 个问答对")
+
+                        # 触发中间文件清理
+                        if self.enable_auto_cleanup:
+                            try:
+                                cleanup_result = self._trigger_file_cleanup(input_file)
+                                # 清理结果记录在_trigger_file_cleanup中，这里不需要额外日志
+                            except Exception as e:
+                                self.logger.warning(f"文件清理触发失败: {str(e)}")
 
                         return {
                             "success": True,

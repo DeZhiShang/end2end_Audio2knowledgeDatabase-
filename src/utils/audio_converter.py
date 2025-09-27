@@ -14,7 +14,7 @@ from src.utils.logger import get_logger
 class AudioConverter:
     """音频格式转换器：支持MP3转WAV"""
 
-    def __init__(self, device="cuda:0"):
+    def __init__(self, device="cuda:1"):
         """
         初始化音频转换器
 

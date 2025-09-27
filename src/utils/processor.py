@@ -22,8 +22,17 @@ from src.core.knowledge_integration import get_knowledge_processor, cleanup_know
 class AudioProcessor:
     """音频处理器：管理端到端的音频处理流程"""
 
-    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4, enable_knowledge_base: bool = True):
-        """初始化处理器"""
+    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4, enable_knowledge_base: bool = True, enable_auto_cleanup: bool = True, cleanup_dry_run: bool = False):
+        """
+        初始化处理器
+
+        Args:
+            enable_async_llm: 是否启用异步LLM处理
+            max_concurrent_llm: 最大并发LLM任务数
+            enable_knowledge_base: 是否启用知识库集成
+            enable_auto_cleanup: 是否启用自动清理中间文件
+            cleanup_dry_run: 是否为清理干运行模式
+        """
         self.logger = get_logger(__name__)
         self.converter = AudioConverter()
         self.diarizer = SpeakerDiarization()
@@ -45,6 +54,10 @@ class AudioProcessor:
         self.enable_knowledge_base = enable_knowledge_base
         self.knowledge_processor = None  # 延迟初始化知识处理器
 
+        # 文件清理配置
+        self.enable_auto_cleanup = enable_auto_cleanup
+        self.cleanup_dry_run = cleanup_dry_run
+
         # 初始化异步LLM处理器
         if self.enable_async_llm:
             self.async_llm_processor = get_async_llm_processor()
@@ -56,7 +69,9 @@ class AudioProcessor:
         if self.enable_knowledge_base:
             self.knowledge_processor = get_knowledge_processor(
                 enable_auto_qa_extraction=True,
-                enable_auto_compaction=True
+                enable_auto_compaction=True,
+                enable_auto_cleanup=self.enable_auto_cleanup,
+                cleanup_dry_run=self.cleanup_dry_run
             )
             # 注册清理函数
             atexit.register(self._cleanup_knowledge_processor)
@@ -245,7 +260,7 @@ class AudioProcessor:
             self.logger.error(f"处理 {wav_file} 时出错: {str(e)}", extra_data={'file': wav_file, 'error': str(e)})
             return "error"
 
-    def convert_mp3_to_wav(self, input_dir="data/input/batch_2", output_dir="data/processed/wavs"):
+    def convert_mp3_to_wav(self, input_dir="data/input", output_dir="data/processed/wavs"):
         """
         批量转换MP3文件为WAV格式
 

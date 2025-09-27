@@ -37,7 +37,7 @@ class ASRProcessor:
                 task=Tasks.auto_speech_recognition,
                 model=self.model_path,
                 model_revision="master",
-                device="cuda:0",
+                device="cuda:1",
                 languege="zh"
             )
             self.logger.info("SenseVoice模型加载完成")

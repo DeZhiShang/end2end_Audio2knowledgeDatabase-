@@ -27,7 +27,7 @@ class SpeakerDiarization:
 
     def __init__(self, model_name="pyannote/speaker-diarization-3.1",
                  auth_token=None,
-                 device="cuda:0"):
+                 device="cuda:1"):
         """
         初始化说话人分离模型
 

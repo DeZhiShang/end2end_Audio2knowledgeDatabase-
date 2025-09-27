@@ -19,7 +19,7 @@ from src.utils.concurrency import get_concurrency_monitor, thread_safe_operation
 class KnowledgeProcessor:
     """知识处理器 - 管理问答对抽取和知识库集成"""
 
-    def __init__(self, enable_auto_qa_extraction: bool = True, enable_auto_compaction: bool = True, enable_system_monitoring: bool = True):
+    def __init__(self, enable_auto_qa_extraction: bool = True, enable_auto_compaction: bool = True, enable_system_monitoring: bool = True, enable_auto_cleanup: bool = True, cleanup_dry_run: bool = False):
         """
         初始化知识处理器
 
@@ -27,11 +27,15 @@ class KnowledgeProcessor:
             enable_auto_qa_extraction: 是否启用自动问答对抽取
             enable_auto_compaction: 是否启用自动压缩
             enable_system_monitoring: 是否启用系统监控
+            enable_auto_cleanup: 是否启用自动清理中间文件
+            cleanup_dry_run: 是否为清理干运行模式
         """
         self.logger = get_logger(__name__)
         self.enable_auto_qa_extraction = enable_auto_qa_extraction
         self.enable_auto_compaction = enable_auto_compaction
         self.enable_system_monitoring = enable_system_monitoring
+        self.enable_auto_cleanup = enable_auto_cleanup
+        self.cleanup_dry_run = cleanup_dry_run
 
         # 核心组件
         self.knowledge_base = get_knowledge_base()
@@ -62,14 +66,18 @@ class KnowledgeProcessor:
         if self.enable_auto_compaction:
             self._check_and_initialize_compactor()
 
-        self.logger.info(f"知识处理器初始化完成 - QA抽取: {enable_auto_qa_extraction}, 自动压缩: {enable_auto_compaction}, 系统监控: {enable_system_monitoring}")
+        self.logger.info(f"知识处理器初始化完成 - QA抽取: {enable_auto_qa_extraction}, 自动压缩: {enable_auto_compaction}, 系统监控: {enable_system_monitoring}, 文件清理: {enable_auto_cleanup}")
 
     def _initialize_qa_extractor(self):
         """延迟初始化问答对抽取器"""
         if self.qa_extractor is None:
             try:
-                self.qa_extractor = QAExtractor()
-                self.logger.info("问答对抽取器初始化成功")
+                self.qa_extractor = QAExtractor(
+                    enable_auto_cleanup=self.enable_auto_cleanup,
+                    cleanup_dry_run=self.cleanup_dry_run
+                )
+                cleanup_mode = "干运行模式" if self.cleanup_dry_run else "实际删除模式"
+                self.logger.info(f"问答对抽取器初始化成功 (文件清理: {'启用' if self.enable_auto_cleanup else '禁用'}, {cleanup_mode if self.enable_auto_cleanup else ''})")
             except Exception as e:
                 self.logger.warning(f"问答对抽取器初始化失败: {str(e)}")
                 self.qa_extractor = False  # 标记为失败
@@ -572,7 +580,7 @@ _knowledge_processor: Optional[KnowledgeProcessor] = None
 _processor_lock = threading.Lock()
 
 
-def get_knowledge_processor(enable_auto_qa_extraction: bool = True, enable_auto_compaction: bool = True, enable_system_monitoring: bool = True) -> KnowledgeProcessor:
+def get_knowledge_processor(enable_auto_qa_extraction: bool = True, enable_auto_compaction: bool = True, enable_system_monitoring: bool = True, enable_auto_cleanup: bool = True, cleanup_dry_run: bool = False) -> KnowledgeProcessor:
     """
     获取全局知识处理器实例
 
@@ -580,6 +588,8 @@ def get_knowledge_processor(enable_auto_qa_extraction: bool = True, enable_auto_
         enable_auto_qa_extraction: 是否启用自动问答对抽取
         enable_auto_compaction: 是否启用自动压缩
         enable_system_monitoring: 是否启用系统监控
+        enable_auto_cleanup: 是否启用自动清理中间文件
+        cleanup_dry_run: 是否为清理干运行模式
 
     Returns:
         KnowledgeProcessor: 知识处理器实例
@@ -592,7 +602,9 @@ def get_knowledge_processor(enable_auto_qa_extraction: bool = True, enable_auto_
                 _knowledge_processor = KnowledgeProcessor(
                     enable_auto_qa_extraction=enable_auto_qa_extraction,
                     enable_auto_compaction=enable_auto_compaction,
-                    enable_system_monitoring=enable_system_monitoring
+                    enable_system_monitoring=enable_system_monitoring,
+                    enable_auto_cleanup=enable_auto_cleanup,
+                    cleanup_dry_run=cleanup_dry_run
                 )
 
     return _knowledge_processor
