@@ -4,7 +4,6 @@
 async_llm:
   # 异步LLM处理配置 (从AudioProcessor.__init__提取)
   enable_async: true
-  max_concurrent_llm: 4 # Glenning清洗最大线程数
 
 knowledge_base:
   # 知识库处理配置 (从AudioProcessor.__init__提取)

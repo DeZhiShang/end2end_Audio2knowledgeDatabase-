@@ -61,7 +61,6 @@ def main():
     # 记录实际使用的配置
     logger.info(f"配置信息:")
     logger.info(f"  - 异步LLM处理: {processor.enable_async_llm}")
-    logger.info(f"  - 最大并发LLM任务: {processor.max_concurrent_llm}")
     logger.info(f"  - 知识库集成: {processor.enable_knowledge_base}")
     logger.info(f"  - 自动清理: {processor.enable_auto_cleanup}")
     logger.info(f"  - Gleaning多轮清洗: {processor.enable_gleaning} (最大轮数: {processor.max_gleaning_rounds})")
@@ -111,7 +110,6 @@ def main():
                     logger.info(f"最近压缩比例: {compression_ratio:.2%}")
 
                 try:
-                    from config import get_config
                     knowledge_base_file = get_config('system.paths.knowledge_base_file', 'data/output/knowledgeDatabase.md')
                 except Exception:
                     knowledge_base_file = "data/output/knowledgeDatabase.md"

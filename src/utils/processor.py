@@ -27,7 +27,6 @@ class AudioProcessor:
 
     def __init__(self,
                  enable_async_llm: Optional[bool] = None,
-                 max_concurrent_llm: Optional[int] = None,
                  enable_knowledge_base: Optional[bool] = None,
                  enable_auto_cleanup: Optional[bool] = None,
                  cleanup_dry_run: Optional[bool] = None,
@@ -38,7 +37,6 @@ class AudioProcessor:
 
         Args:
             enable_async_llm: 是否启用异步LLM处理，如果为None则从配置获取
-            max_concurrent_llm: 最大并发LLM任务数，如果为None则从配置获取
             enable_knowledge_base: 是否启用知识库集成，如果为None则从配置获取
             enable_auto_cleanup: 是否启用自动清理中间文件，如果为None则从配置获取
             cleanup_dry_run: 是否为清理干运行模式，如果为None则从配置获取
@@ -49,7 +47,6 @@ class AudioProcessor:
 
         # 从配置系统获取参数
         self.enable_async_llm = enable_async_llm if enable_async_llm is not None else get_config('processing.async_llm.enable_async', True)
-        self.max_concurrent_llm = max_concurrent_llm or get_config('processing.async_llm.max_concurrent_llm', 4)
         self.enable_knowledge_base = enable_knowledge_base if enable_knowledge_base is not None else get_config('processing.knowledge_base.enable_knowledge_base', True)
         self.enable_auto_cleanup = enable_auto_cleanup if enable_auto_cleanup is not None else get_config('processing.file_cleanup.enable_auto_cleanup', True)
         self.cleanup_dry_run = cleanup_dry_run if cleanup_dry_run is not None else get_config('processing.file_cleanup.cleanup_dry_run', False)
