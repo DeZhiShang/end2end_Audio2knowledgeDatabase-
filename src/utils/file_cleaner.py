@@ -25,12 +25,23 @@ class IntermediateFileCleaner:
         self.enable_cleanup = enable_cleanup
         self.dry_run = dry_run
 
-        # 基础路径配置
-        self.base_paths = {
-            'rttm_dir': 'data/processed/rttms',
-            'wav_dir': 'data/processed/wavs',
-            'docs_dir': 'data/output/docs'
-        }
+        # 基础路径配置，优先从配置系统获取
+        try:
+            from config import get_processing_paths, get_output_paths
+            processing_paths = get_processing_paths()
+            output_paths = get_output_paths()
+            self.base_paths = {
+                'rttm_dir': processing_paths['rttm_dir'],
+                'wav_dir': processing_paths['wav_dir'],
+                'docs_dir': output_paths['docs_dir']
+            }
+        except Exception:
+            # 回退到硬编码默认值
+            self.base_paths = {
+                'rttm_dir': 'data/processed/rttms',
+                'wav_dir': 'data/processed/wavs',
+                'docs_dir': 'data/output/docs'
+            }
 
         if not self.enable_cleanup:
             self.logger.info("中间文件清理已禁用")
@@ -54,7 +65,7 @@ class IntermediateFileCleaner:
             file_name = Path(file_path).stem
 
             # 对于docs目录下的文件，直接使用文件名作为编号
-            if 'data/output/docs' in file_path:
+            if self.base_paths['docs_dir'] in file_path:
                 return file_name
 
             # 对于其他路径，也使用文件名作为编号

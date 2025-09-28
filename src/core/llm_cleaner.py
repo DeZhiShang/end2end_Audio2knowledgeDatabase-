@@ -103,8 +103,8 @@ class LLMDataCleaner:
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": evaluation_prompt}],
-                temperature=0.1,
-                max_tokens=1000,
+                temperature=get_config('models.llm.temperature', 0.1),
+                max_tokens=get_config('system.token_limits.llm_cleaning.check_tokens', 1000),
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -229,8 +229,8 @@ class LLMDataCleaner:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     messages=[{"role": "user", "content": gleaning_prompt}],
-                    temperature=0.1,
-                    max_tokens=4000,
+                    temperature=get_config('models.llm.temperature', 0.1),
+                    max_tokens=get_config('system.token_limits.llm_cleaning.clean_tokens', 4000),
                 )
 
                 round_result = response.choices[0].message.content.strip()
@@ -334,8 +334,8 @@ class LLMDataCleaner:
                 messages=[
                     {"role": "user", "content": full_prompt}
                 ],
-                temperature=0.1,  # 较低的温度确保稳定输出
-                max_tokens=4000,  # 足够的token数量
+                temperature=get_config('models.llm.temperature', 0.1),  # 较低的温度确保稳定输出
+                max_tokens=get_config('system.token_limits.llm_cleaning.clean_tokens', 4000),  # 足够的token数量
             )
 
             cleaned_content = response.choices[0].message.content.strip()
@@ -473,13 +473,13 @@ class LLMDataCleaner:
             }
 
 
-    def batch_clean_directory(self, input_dir: str = "docs", output_dir: str = "docs", enable_gleaning: bool = True, max_rounds: int = None, quality_threshold: float = None) -> Dict[str, Any]:
+    def batch_clean_directory(self, input_dir: str = None, output_dir: str = None, enable_gleaning: bool = True, max_rounds: int = None, quality_threshold: float = None) -> Dict[str, Any]:
         """
         批量清洗目录下的所有ASR结果文件（支持gleaning）
 
         Args:
-            input_dir: 输入目录路径
-            output_dir: 输出目录路径
+            input_dir: 输入目录路径，为None时从配置获取
+            output_dir: 输出目录路径，为None时从配置获取
             enable_gleaning: 是否启用gleaning多轮清洗
             max_rounds: 最大清洗轮数（None使用默认值）
             quality_threshold: 质量阈值（None使用默认值）
@@ -487,6 +487,22 @@ class LLMDataCleaner:
         Returns:
             Dict[str, Any]: 批量处理结果统计
         """
+        # 从配置系统获取默认路径
+        if input_dir is None or output_dir is None:
+            try:
+                from config import get_output_paths
+                output_paths = get_output_paths()
+                if input_dir is None:
+                    input_dir = output_paths['docs_dir']
+                if output_dir is None:
+                    output_dir = output_paths['docs_dir']
+            except Exception:
+                # 回退到硬编码默认值
+                if input_dir is None:
+                    input_dir = "data/output/docs"
+                if output_dir is None:
+                    output_dir = "data/output/docs"
+
         if not os.path.exists(input_dir):
             return {
                 "success": False,

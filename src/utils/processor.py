@@ -134,9 +134,18 @@ class AudioProcessor:
             self.logger.info(f"开始处理音频文件: {wav_file}")
 
             # 检查是否完全跳过（四个步骤都已完成）
-            rttm_file = f"data/processed/rttms/{filename}.rttm"
-            output_directory = f"data/processed/wavs/{filename}"
-            asr_output_file = f"data/output/docs/{filename}.md"
+            # 使用配置系统的路径模板生成文件路径
+            try:
+                from config import format_file_paths
+                paths = format_file_paths(filename)
+                rttm_file = paths['rttm_file']
+                output_directory = paths['wav_output_dir']
+                asr_output_file = paths['docs_file']
+            except Exception as e:
+                # 如果配置系统失败，回退到硬编码路径以保持向后兼容
+                rttm_file = f"data/processed/rttms/{filename}.rttm"
+                output_directory = f"data/processed/wavs/{filename}"
+                asr_output_file = f"data/output/docs/{filename}.md"
 
             # 统一输出到docs目录（ASR和LLM清洗都用同一文件）
             final_output_file = asr_output_file  # 无论是否清洗，都输出到同一文件
@@ -185,7 +194,13 @@ class AudioProcessor:
             else:
                 self.logger.info("开始ASR语音识别...")
                 # 确保docs目录存在
-                os.makedirs("data/output/docs", exist_ok=True)
+                try:
+                    from config import get_output_paths
+                    output_paths = get_output_paths()
+                    docs_dir = output_paths['docs_dir']
+                except Exception:
+                    docs_dir = "data/output/docs"
+                os.makedirs(docs_dir, exist_ok=True)
                 asr_result = self.asr_processor.process_audio_directory(output_directory, asr_output_file, force_overwrite)
                 self.logger.info(f"ASR识别完成: 成功{asr_result['success']}个, 失败{asr_result['error']}个",
                                extra_data={'success_count': asr_result['success'], 'error_count': asr_result['error']})
@@ -274,27 +289,45 @@ class AudioProcessor:
             self.logger.error(f"处理 {wav_file} 时出错: {str(e)}", extra_data={'file': wav_file, 'error': str(e)})
             return "error"
 
-    def convert_mp3_to_wav(self, input_dir="data/input", output_dir="data/processed/wavs"):
+    def convert_mp3_to_wav(self, input_dir=None, output_dir=None):
         """
         批量转换MP3文件为WAV格式
 
         Args:
-            input_dir: MP3文件所在目录
-            output_dir: WAV文件输出目录
+            input_dir: MP3文件所在目录，为None时从配置获取
+            output_dir: WAV文件输出目录，为None时从配置获取
 
         Returns:
             dict: 转换结果统计
         """
+        # 从配置系统获取默认路径
+        if input_dir is None or output_dir is None:
+            try:
+                from config import get_input_paths, get_processing_paths
+                input_paths = get_input_paths()
+                processing_paths = get_processing_paths()
+
+                if input_dir is None:
+                    input_dir = input_paths['input_dir']
+                if output_dir is None:
+                    output_dir = processing_paths['wav_dir']
+            except Exception:
+                # 回退到硬编码默认值
+                if input_dir is None:
+                    input_dir = "data/input"
+                if output_dir is None:
+                    output_dir = "data/processed/wavs"
+
         self.logger.info("开始MP3转WAV预处理...")
         return self.converter.convert_mp3_to_wav(input_dir, output_dir)
 
-    def process_batch(self, input_dir="data/processed/wavs", enable_mp3_conversion=True, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
+    def process_batch(self, input_dir=None, enable_mp3_conversion=True, force_overwrite=False, enable_llm_cleaning=True, enable_gleaning=None):
         """
         批量处理指定目录下的所有音频文件
         支持自动MP3转WAV预处理、智能跳过和LLM数据清洗（含Gleaning）
 
         Args:
-            input_dir: 输入目录路径
+            input_dir: 输入目录路径，为None时从配置获取
             enable_mp3_conversion: 是否启用MP3转WAV预处理
             force_overwrite: 是否强制覆盖已存在的结果
             enable_llm_cleaning: 是否启用LLM数据清洗
@@ -303,6 +336,16 @@ class AudioProcessor:
         Returns:
             dict: 处理结果统计
         """
+        # 从配置系统获取默认输入目录
+        if input_dir is None:
+            try:
+                from config import get_processing_paths
+                processing_paths = get_processing_paths()
+                input_dir = processing_paths['wav_dir']
+            except Exception:
+                # 回退到硬编码默认值
+                input_dir = "data/processed/wavs"
+
         # 使用默认gleaning配置
         if enable_gleaning is None:
             enable_gleaning = self.enable_gleaning
@@ -315,7 +358,17 @@ class AudioProcessor:
                            extra_data=conversion_results)
 
         # 步骤2: 获取目录下所有的wav文件
-        wav_files = glob.glob(f"{input_dir}/*.wav")
+        try:
+            from config import get_config
+            audio_extensions = get_config('system.file_formats.audio_extensions', ['.wav'])
+            if isinstance(audio_extensions, list) and audio_extensions:
+                primary_ext = audio_extensions[0].lstrip('.')
+            else:
+                primary_ext = 'wav'
+        except Exception:
+            primary_ext = 'wav'
+
+        wav_files = glob.glob(f"{input_dir}/*.{primary_ext}")
 
         if not wav_files:
             self.logger.warning(f"警告: {input_dir}目录下没有找到任何wav文件")

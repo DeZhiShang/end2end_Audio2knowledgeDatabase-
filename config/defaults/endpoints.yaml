@@ -1,0 +1,32 @@
+# 端点和网络配置
+# 包含原系统中实际存在的API端点和网络参数
+
+embedding:
+  # Embedding服务配置 (从embedding_similarity.py:38提取)
+  url: "http://localhost:8001/v1/embeddings"
+  model_name: "qwen3-embedding-8b"  # 从embedding_similarity.py:98提取
+
+  # 超时配置 (从embedding_similarity.py实际使用的参数)
+  timeout: 60          # 批量处理超时
+  standard_timeout: 30 # 标准处理超时
+
+network:
+  # 网络相关配置
+  default_timeout: 30
+  max_retries: 3
+
+  # 文件操作超时 (从实际代码中提取)
+  file_lock_timeout: 15.0    # knowledge_base.py:443
+  thread_join_timeout: 5.0   # async_llm_processor.py:93
+
+  # 监控和调度器线程超时
+  monitor_thread_timeout: 30   # system_monitor.py:131, qa_compactor.py:1109
+  queue_get_timeout: 1.0       # async_llm_processor.py:262
+
+delays:
+  # 各种延迟参数 (从实际代码中提取的time.sleep值)
+  queue_check: 0.1           # async_llm_processor.py:199
+  retry_delay: 0.5           # async_llm_processor.py:230
+  error_recovery: 1.0        # async_llm_processor.py:287
+  async_task_delay: 0.1      # async_llm_processor.py:278
+  concurrency_cleanup_delay: 0.1  # concurrency.py:94

@@ -112,14 +112,23 @@ class DualBufferKnowledgeBase:
     实现Append-Only + Compact架构，支持高并发写入和无冲突压缩
     """
 
-    def __init__(self, knowledge_base_file: str = "data/output/knowledgeDatabase.md"):
+    def __init__(self, knowledge_base_file: str = None):
         """
         初始化双缓存知识库
 
         Args:
-            knowledge_base_file: 知识库主文件路径
+            knowledge_base_file: 知识库主文件路径，为None时从配置获取
         """
         self.logger = get_logger(__name__)
+
+        # 从配置系统获取知识库文件路径
+        if knowledge_base_file is None:
+            try:
+                from config import get_config
+                knowledge_base_file = get_config('system.paths.knowledge_base_file', 'data/output/knowledgeDatabase.md')
+            except Exception:
+                knowledge_base_file = "data/output/knowledgeDatabase.md"
+
         self.knowledge_base_file = knowledge_base_file
 
         # 创建输出目录

@@ -1,0 +1,21 @@
+# 文件格式配置
+# 包含原系统中实际存在的文件扩展名和格式字符串
+
+audio_extensions:
+  - ".wav"
+  - ".mp3"
+
+document_extensions:
+  - ".md"
+  - ".txt"
+
+data_extensions:
+  - ".json"
+  - ".yaml"
+  - ".yml"
+
+filename_patterns:
+  # 文件名模式 (从实际代码中提取)
+  audio_segment: "{segment_count:03d}_{speaker_id}-{start_time:.3f}-{end_time:.3f}.wav"  # audio_segmentation.py:118
+  asr_output: "{base_name}{suffix}.md"        # llm_cleaner.py:389
+  json_log: "audio_processor_{date}.json"     # logger.py:171 (格式化日期)

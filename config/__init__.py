@@ -31,6 +31,12 @@ from .manager import (
     get_device,
     get_model_path,
     get_api_config,
+    get_path_from_template,
+    format_file_paths,
+    get_input_paths,
+    get_processing_paths,
+    get_output_paths,
+    ensure_directories,
 )
 
 from .schemas.config_schema import (
@@ -64,6 +70,12 @@ __all__ = [
     'get_device',
     'get_model_path',
     'get_api_config',
+    'get_path_from_template',
+    'format_file_paths',
+    'get_input_paths',
+    'get_processing_paths',
+    'get_output_paths',
+    'ensure_directories',
 
     # 配置模式类
     'AppConfig',

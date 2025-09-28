@@ -35,20 +35,29 @@ class EmbeddingCache:
 class EmbeddingSimilarityCalculator:
     """基于Embedding的相似度计算器"""
 
-    def __init__(self, embedding_url: str = "http://localhost:8001/v1/embeddings"):
+    def __init__(self, embedding_url: str = None):
         """
         初始化Embedding相似度计算器
 
         Args:
-            embedding_url: qwen3-embedding-8b模型服务地址
+            embedding_url: qwen3-embedding-8b模型服务地址，为None时从配置获取
         """
         self.logger = get_logger(__name__)
-        self.embedding_url = embedding_url
+
+        # 从配置系统获取端点配置
+        try:
+            from config import get_config
+            self.embedding_url = embedding_url or get_config('system.endpoints.embedding.url', 'http://localhost:8001/v1/embeddings')
+            self.model_name = get_config('system.endpoints.embedding.model_name', 'qwen3-embedding-8b')
+            self.embedding_dim = get_config('system.compaction.audio.embedding_dimensions', 4096)
+        except Exception as e:
+            # 如果配置系统失败，回退到硬编码值以保持向后兼容
+            self.embedding_url = embedding_url or "http://localhost:8001/v1/embeddings"
+            self.model_name = "qwen3-embedding-8b"
+            self.embedding_dim = 4096
+
         self.cache: Dict[str, EmbeddingCache] = {}
         self.cache_lock = threading.RLock()
-
-        # 向量维度（qwen3-embedding-8b输出4096维）
-        self.embedding_dim = 4096
 
         # 聚类参数 (从配置系统获取)
         self.min_cluster_size = get_config('algorithms.clustering.min_cluster_size', 2)
@@ -67,7 +76,7 @@ class EmbeddingSimilarityCalculator:
         self.avg_qa_tokens = get_config('algorithms.tokens.avg_qa_tokens', 200)
         self.embedding_context_limit = get_config('algorithms.tokens.embedding_context_limit', 16384)
 
-    def get_embeddings_batch(self, texts: List[str], max_retries: int = 3) -> List[Optional[np.ndarray]]:
+    def get_embeddings_batch(self, texts: List[str], max_retries: int = None) -> List[Optional[np.ndarray]]:
         """
         批量获取文本的向量表示
 
@@ -80,6 +89,14 @@ class EmbeddingSimilarityCalculator:
         """
         if not texts:
             return []
+
+        # 从配置获取重试次数
+        if max_retries is None:
+            try:
+                from config import get_config
+                max_retries = get_config('system.concurrency.embedding.max_retries', 3)
+            except Exception:
+                max_retries = 3
 
         # 过滤空文本
         valid_texts = []
@@ -95,7 +112,7 @@ class EmbeddingSimilarityCalculator:
         for attempt in range(max_retries):
             try:
                 payload = {
-                    "model": "qwen3-embedding-8b",
+                    "model": self.model_name,
                     "input": valid_texts,  # 批量输入
                     "encoding_format": "float"
                 }
@@ -135,7 +152,7 @@ class EmbeddingSimilarityCalculator:
 
         return [None] * len(texts)
 
-    def get_embedding(self, text: str, max_retries: int = 3) -> Optional[np.ndarray]:
+    def get_embedding(self, text: str, max_retries: int = None) -> Optional[np.ndarray]:
         """
         获取文本的向量表示
 
@@ -149,10 +166,18 @@ class EmbeddingSimilarityCalculator:
         if not text or not text.strip():
             return None
 
+        # 从配置获取重试次数
+        if max_retries is None:
+            try:
+                from config import get_config
+                max_retries = get_config('system.concurrency.embedding.max_retries', 3)
+            except Exception:
+                max_retries = 3
+
         for attempt in range(max_retries):
             try:
                 payload = {
-                    "model": "qwen3-embedding-8b",
+                    "model": self.model_name,
                     "input": text.strip(),
                     "encoding_format": "float"
                 }
@@ -188,7 +213,7 @@ class EmbeddingSimilarityCalculator:
 
         return None
 
-    def get_qa_embeddings_batch_parallel(self, qa_pairs: List[QAPair], batch_size: int = 35, max_workers: int = 4) -> Dict[str, EmbeddingCache]:
+    def get_qa_embeddings_batch_parallel(self, qa_pairs: List[QAPair], batch_size: int = None, max_workers: int = None) -> Dict[str, EmbeddingCache]:
         """
         并行分批获取问答对的向量表示 - 解决长上下文问题
 
@@ -200,6 +225,22 @@ class EmbeddingSimilarityCalculator:
         Returns:
             Dict[str, EmbeddingCache]: QA ID到缓存向量数据的映射
         """
+        # 从配置获取默认批处理大小
+        if batch_size is None:
+            try:
+                from config import get_config
+                batch_size = get_config('models.embedding.default_batch_size', 35)
+            except Exception:
+                batch_size = 35
+
+        # 从配置获取最大工作线程数
+        if max_workers is None:
+            try:
+                from config import get_config
+                max_workers = get_config('system.concurrency.embedding.max_workers', 4)
+            except Exception:
+                max_workers = 4
+
         results = {}
         uncached_pairs = []
 
@@ -312,7 +353,7 @@ class EmbeddingSimilarityCalculator:
 
         return batch_results
 
-    def get_qa_embeddings_batch(self, qa_pairs: List[QAPair], batch_size: int = 35) -> Dict[str, EmbeddingCache]:
+    def get_qa_embeddings_batch(self, qa_pairs: List[QAPair], batch_size: int = None) -> Dict[str, EmbeddingCache]:
         """
         批量获取问答对的向量表示（带缓存）
 
@@ -323,6 +364,14 @@ class EmbeddingSimilarityCalculator:
         Returns:
             Dict[str, EmbeddingCache]: QA ID到缓存向量数据的映射
         """
+        # 从配置获取默认批处理大小
+        if batch_size is None:
+            try:
+                from config import get_config
+                batch_size = get_config('models.embedding.default_batch_size', 35)
+            except Exception:
+                batch_size = 35
+
         results = {}
         uncached_pairs = []
 
@@ -603,7 +652,7 @@ class EmbeddingPrefilter:
         self.logger = get_logger(__name__)
         self.similarity_calc = similarity_calculator
 
-    def prefilter_for_llm(self, qa_pairs: List[QAPair], batch_size: int = 35) -> List[List[QAPair]]:
+    def prefilter_for_llm(self, qa_pairs: List[QAPair], batch_size: int = None) -> List[List[QAPair]]:
         """
         为LLM分析预筛选相似问答对
 
@@ -617,6 +666,14 @@ class EmbeddingPrefilter:
         Returns:
             List[List[QAPair]]: 预筛选后的批次列表
         """
+        # 从配置获取默认批处理大小
+        if batch_size is None:
+            try:
+                from config import get_config
+                batch_size = get_config('models.embedding.default_batch_size', 35)
+            except Exception:
+                batch_size = 35
+
         if len(qa_pairs) <= batch_size:
             # 数量不多，直接返回单批次
             return [qa_pairs]

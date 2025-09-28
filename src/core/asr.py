@@ -163,7 +163,17 @@ class ASRProcessor:
             list: 排序后的音频文件路径列表
         """
         # 获取所有wav文件
-        audio_files = glob.glob(os.path.join(audio_dir, "*.wav"))
+        try:
+            from config import get_config
+            audio_extensions = get_config('system.file_formats.audio_extensions', ['.wav'])
+            if isinstance(audio_extensions, list) and audio_extensions:
+                primary_ext = audio_extensions[0].lstrip('.')  # 使用第一个作为主要格式
+            else:
+                primary_ext = 'wav'
+        except Exception:
+            primary_ext = 'wav'
+
+        audio_files = glob.glob(os.path.join(audio_dir, f"*.{primary_ext}"))
 
         # 按文件名中的序号排序（提取文件名开头的数字）
         def extract_sequence_number(filename):

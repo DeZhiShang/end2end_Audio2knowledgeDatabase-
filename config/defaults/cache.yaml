@@ -1,0 +1,6 @@
+# 缓存配置
+# 包含原系统中实际存在的缓存参数
+
+lru_cache:
+  # LRU缓存配置 (从config/manager.py:231提取)
+  config_manager_maxsize: 128  # 配置管理器LRU缓存最大条目数

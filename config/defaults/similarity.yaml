@@ -1,0 +1,10 @@
+# 相似度配置
+# 包含原系统中实际存在的相似度阈值参数
+
+thresholds:
+  # 相似度阈值配置 (从实际代码中提取)
+  default_similarity: 0.75    # 默认相似度阈值 (qa_compactor.py:358,958)
+  knowledge_integration: 0.7   # 知识集成相似度阈值 (knowledge_integration.py:495)
+  qa_compaction: 0.75         # 问答压缩相似度阈值 (qa_compactor.py:358,958)
+  final_compression: 0.7      # 最终压缩相似度阈值 (knowledge_integration.py:495)
+  qa_similarity_threshold: 0.75  # QA相似度阈值 (knowledge_integration.py:301)

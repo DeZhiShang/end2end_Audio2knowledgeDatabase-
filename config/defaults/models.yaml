@@ -12,7 +12,7 @@ asr:
   model_path: "/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small"
   device: "cuda:1"
   model_revision: "master"
-  languege: "zh"  # 注意：保持原项目中的拼写错误
+  languege: "zh" 
 
 llm:
   # LLM配置 (从各个模块中的实际使用提取)
@@ -27,8 +27,9 @@ llm:
 
 embedding:
   # 向量化配置 (从EmbeddingSimilarity模块提取)
-  parallel_batch_size: 35  # 并行处理批次大小
-  max_workers: 4          # 最大并行工作线程数
+  parallel_batch_size: 35  # 分批送入Embedding的最大批数
+  default_batch_size: 35   # 方法默认的批处理大小
+  max_workers: 4          # 压缩过程最大线程数
 
   # 相似度阈值配置
   high_similarity_threshold: 0.85

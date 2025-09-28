@@ -1,0 +1,27 @@
+# 压缩和处理配置
+# 包含原系统中实际存在的压缩和处理参数
+
+qa_compactor:
+  # 压缩调度器配置 (从qa_compactor.py:1067-1070提取)
+  scheduler:
+    min_qa_pairs_threshold: 50          # 最少问答对数量才触发压缩
+    compression_ratio_threshold: 0.1     # 最小压缩比例才有意义
+    min_inactive_buffer_size: 20        # 非活跃缓冲区最小大小才压缩
+    max_time_since_last_compaction: 60  # 最大时间间隔（分钟）
+
+knowledge_integration:
+  # 知识集成配置 (从knowledge_integration.py:448提取)
+  final_compression_threshold: 5  # 最终压缩的最小阈值
+
+  # 相似度配置 (从knowledge_integration.py:483提取)
+  default_similarity_threshold: 0.7  # 稍微宽松的阈值，确保更好的压缩效果
+
+  # 问答对处理的相似性阈值 (从多个模块的方法默认值提取)
+  qa_similarity_threshold: 0.75  # qa_compactor.py和knowledge_integration.py中的默认值
+
+audio:
+  # 音频处理配置 (从audio_converter.py:28提取)
+  default_sample_rate: 16000  # 默认采样率
+
+  # 向量配置 (从embedding_similarity.py:51提取)
+  embedding_dimensions: 4096  # qwen3-embedding-8b输出4096维

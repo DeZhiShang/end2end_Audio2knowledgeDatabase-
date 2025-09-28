@@ -17,7 +17,7 @@ from src.utils.logger import get_logger
 class AsyncLLMProcessor:
     """异步LLM处理器：管理LLM清洗任务的异步执行"""
 
-    def __init__(self, max_concurrent_tasks: int = 16, max_retries: int = 2):
+    def __init__(self, max_concurrent_tasks: int = None, max_retries: int = None):
         """
         初始化异步LLM处理器
 
@@ -26,8 +26,15 @@ class AsyncLLMProcessor:
             max_retries: 最大重试次数
         """
         self.logger = get_logger(__name__)
-        self.max_concurrent_tasks = max_concurrent_tasks
-        self.max_retries = max_retries
+
+        # 从配置获取默认值
+        try:
+            from config import get_config
+            self.max_concurrent_tasks = max_concurrent_tasks or get_config('system.concurrency.async_llm.max_concurrent_tasks', 16)
+            self.max_retries = max_retries or get_config('system.concurrency.async_llm.max_retries', 2)
+        except Exception:
+            self.max_concurrent_tasks = max_concurrent_tasks or 16
+            self.max_retries = max_retries or 2
 
         # 任务队列和状态管理
         self.task_queue = Queue()
@@ -196,7 +203,12 @@ class AsyncLLMProcessor:
                     'error': f'等待任务{task_id}超时'
                 }
 
-            time.sleep(0.1)
+            try:
+                from config import get_config
+                delay = get_config('system.endpoints.delays.queue_check', 0.1)
+            except Exception:
+                delay = 0.1
+            time.sleep(delay)
 
     def wait_for_all_tasks(self, timeout: float = None) -> Dict[str, Any]:
         """
@@ -227,7 +239,13 @@ class AsyncLLMProcessor:
                     'remaining_queue': self.task_queue.qsize(),
                     'active_tasks': len(self.active_tasks)
                 }
-            time.sleep(0.5)
+
+            try:
+                from config import get_config
+                delay = get_config('system.endpoints.delays.retry_delay', 0.5)
+            except Exception:
+                delay = 0.5
+            time.sleep(delay)
 
         return {
             'status': 'completed',
@@ -259,7 +277,12 @@ class AsyncLLMProcessor:
             try:
                 # 获取任务（非阻塞）
                 try:
-                    task = self.task_queue.get(timeout=1.0)
+                    try:
+                        from config import get_config
+                        timeout = get_config('system.endpoints.network.queue_get_timeout', 1.0)
+                    except Exception:
+                        timeout = 1.0
+                    task = self.task_queue.get(timeout=timeout)
                 except Empty:
                     continue
 
@@ -270,7 +293,12 @@ class AsyncLLMProcessor:
                 if len(self.active_tasks) >= self.max_concurrent_tasks:
                     # 放回队列，稍后重试
                     self.task_queue.put(task)
-                    time.sleep(0.1)
+                    try:
+                        from config import get_config
+                        delay = get_config('system.endpoints.delays.async_task_delay', 0.1)
+                    except Exception:
+                        delay = 0.1
+                    time.sleep(delay)
                     continue
 
                 # 提交任务到线程池
@@ -279,7 +307,12 @@ class AsyncLLMProcessor:
 
             except Exception as e:
                 self.logger.error(f"工作线程异常: {str(e)}")
-                time.sleep(1.0)
+                try:
+                    from config import get_config
+                    delay = get_config('system.endpoints.delays.error_recovery', 1.0)
+                except Exception:
+                    delay = 1.0
+                time.sleep(delay)
 
         self.logger.info("异步LLM处理器工作线程已退出")
 

@@ -281,7 +281,7 @@ class KnowledgeProcessor:
             }
 
     @thread_safe_operation("trigger_compaction")
-    def trigger_compaction(self, similarity_threshold: float = 0.75) -> Dict[str, Any]:
+    def trigger_compaction(self, similarity_threshold: float = None) -> Dict[str, Any]:
         """
         手动触发压缩操作
 
@@ -292,6 +292,14 @@ class KnowledgeProcessor:
             Dict[str, Any]: 压缩结果
         """
         try:
+            # 从配置获取默认相似性阈值
+            if similarity_threshold is None:
+                try:
+                    from config import get_config
+                    similarity_threshold = get_config('system.compaction.knowledge_integration.qa_similarity_threshold', 0.75)
+                except Exception:
+                    similarity_threshold = 0.75
+
             # 初始化压缩器
             self._initialize_qa_compactor()
             if not self.qa_compactor or self.qa_compactor is False:
@@ -444,8 +452,12 @@ class KnowledgeProcessor:
 
             self.logger.info(f"知识库状态: 总计{total_qa_pairs}个问答对, 活跃缓冲区{active_buffer_size}个")
 
-            # 使用更宽松的最终压缩条件
-            final_compression_threshold = 5  # 最终压缩的最小阈值
+            # 使用更宽松的最终压缩条件 - 从配置系统获取
+            try:
+                from config import get_config
+                final_compression_threshold = get_config('system.compaction.knowledge_integration.final_compression_threshold', 5)
+            except Exception:
+                final_compression_threshold = 5  # 最终压缩的最小阈值
 
             if total_qa_pairs < final_compression_threshold:
                 self.logger.info(f"问答对数量不足({total_qa_pairs} < {final_compression_threshold})，跳过最终压缩")
@@ -478,9 +490,17 @@ class KnowledgeProcessor:
 
             # 执行压缩（使用LLM智能检验，适中的相似度阈值）
             self.logger.info("正在执行最终压缩...")
+
+            # 从配置获取最终压缩相似度阈值
+            try:
+                from config import get_config
+                final_threshold = get_config('system.similarity.thresholds.final_compression', 0.7)
+            except Exception:
+                final_threshold = 0.7
+
             compaction_result = self.qa_compactor.compact_qa_pairs(
                 snapshot.data,
-                similarity_threshold=0.7,  # 稍微宽松的阈值，确保更好的压缩效果
+                similarity_threshold=final_threshold,  # 稍微宽松的阈值，确保更好的压缩效果
                 use_llm_similarity=True
             )
 

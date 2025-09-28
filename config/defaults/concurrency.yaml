@@ -1,0 +1,17 @@
+# 并发和重试配置
+# 包含原系统中实际存在的并发和重试参数
+
+async_llm:
+  # 异步LLM处理配置 (从async_llm_processor.py:20提取)
+  max_concurrent_tasks: 16  # 最大并发任务数
+  max_retries: 2           # 最大重试次数
+
+embedding:
+  # Embedding处理配置 (从embedding_similarity.py提取)
+  max_retries: 3           # 最大重试次数 (embedding_similarity.py:79,147)
+  max_workers: 4           # 最大工作线程数 (embedding_similarity.py:200)
+  batch_size: 35           # 批处理大小 (embedding_similarity.py:218,349,651)
+
+file_operations:
+  # 文件操作配置 (从concurrency.py:124提取)
+  max_age_minutes: 30      # 锁文件最大存活时间(分钟)

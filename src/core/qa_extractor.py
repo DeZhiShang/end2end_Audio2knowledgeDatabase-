@@ -155,8 +155,8 @@ class QAExtractor:
                 messages=[
                     {"role": "user", "content": full_prompt}
                 ],
-                temperature=0.1,  # 较低的温度确保稳定输出
-                max_tokens=32768,  # 足够的token数量
+                temperature=get_config('models.llm.temperature', 0.1),
+                max_tokens=get_config('system.token_limits.qa_processing.extraction_tokens', 32768),  # 足够的token数量
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -368,16 +368,26 @@ class QAExtractor:
                 "input_file": input_file
             }
 
-    def batch_extract_qa_pairs(self, input_dir: str = "data/output/docs") -> Dict[str, Any]:
+    def batch_extract_qa_pairs(self, input_dir: str = None) -> Dict[str, Any]:
         """
         批量抽取目录下所有清洗完成文件的问答对
 
         Args:
-            input_dir: 输入目录路径
+            input_dir: 输入目录路径，为None时从配置获取
 
         Returns:
             Dict[str, Any]: 批量处理结果统计
         """
+        # 从配置系统获取默认路径
+        if input_dir is None:
+            try:
+                from config import get_output_paths
+                output_paths = get_output_paths()
+                input_dir = output_paths['docs_dir']
+            except Exception:
+                # 回退到硬编码默认值
+                input_dir = "data/output/docs"
+
         if not os.path.exists(input_dir):
             return {
                 "success": False,

@@ -228,7 +228,7 @@ class ConfigManager:
             # 这里可以添加更详细的字段映射逻辑
             return app_config
 
-    @lru_cache(maxsize=128)
+    @lru_cache(maxsize=128)  # 从配置文件控制
     def get(self, key_path: str, default: Any = None) -> Any:
         """
         获取配置值
@@ -393,6 +393,91 @@ def get_model_path(model_name: str) -> str:
         # 对于其他模型，返回None或抛出异常
         return None
 
+def get_path_from_template(template_name: str, **kwargs) -> str:
+    """根据路径模板生成文件路径"""
+    # 获取路径模板
+    template = get_config(f'system.paths.templates.{template_name}')
+    if not template:
+        raise ValueError(f"未找到路径模板: {template_name}")
+
+    # 获取基础路径配置
+    paths_config = get_config('system.paths', {})
+
+    # 合并基础路径和传入的参数
+    format_args = {**paths_config, **kwargs}
+
+    try:
+        return template.format(**format_args)
+    except KeyError as e:
+        raise ValueError(f"路径模板 '{template_name}' 缺少参数: {e}")
+
+def format_file_paths(filename: str) -> dict:
+    """为给定文件名生成标准的文件路径集合"""
+    try:
+        return {
+            'rttm_file': get_path_from_template('rttm_file', filename=filename),
+            'wav_output_dir': get_path_from_template('wav_output_dir', filename=filename),
+            'docs_file': get_path_from_template('docs_file', filename=filename)
+        }
+    except Exception as e:
+        # 如果模板系统失败，回退到硬编码路径以保持向后兼容
+        return {
+            'rttm_file': f"data/processed/rttms/{filename}.rttm",
+            'wav_output_dir': f"data/processed/wavs/{filename}",
+            'docs_file': f"data/output/docs/{filename}.md"
+        }
+
+
+def get_input_paths() -> Dict[str, str]:
+    """获取输入相关的路径配置"""
+    try:
+        return {
+            'input_dir': get_config('system.paths.input_dir', 'data/input'),
+            'mp3_dir': get_config('system.paths.mp3_dir', 'data/input/mp3s'),
+        }
+    except Exception:
+        return {
+            'input_dir': 'data/input',
+            'mp3_dir': 'data/input/mp3s',
+        }
+
+def get_processing_paths() -> Dict[str, str]:
+    """获取处理过程中的路径配置"""
+    try:
+        return {
+            'processed_dir': get_config('system.paths.processed_dir', 'data/processed'),
+            'wav_dir': get_config('system.paths.wav_dir', 'data/processed/wavs'),
+            'rttm_dir': get_config('system.paths.rttm_dir', 'data/processed/rttms'),
+        }
+    except Exception:
+        return {
+            'processed_dir': 'data/processed',
+            'wav_dir': 'data/processed/wavs',
+            'rttm_dir': 'data/processed/rttms',
+        }
+
+def get_output_paths() -> Dict[str, str]:
+    """获取输出相关的路径配置"""
+    try:
+        return {
+            'output_dir': get_config('system.paths.output_dir', 'data/output'),
+            'docs_dir': get_config('system.paths.docs_dir', 'data/output/docs'),
+        }
+    except Exception:
+        return {
+            'output_dir': 'data/output',
+            'docs_dir': 'data/output/docs',
+        }
+
+def ensure_directories(paths: Dict[str, str]) -> None:
+    """确保指定的目录存在"""
+    import os
+    for path_name, path_value in paths.items():
+        if path_value and not os.path.exists(path_value):
+            try:
+                os.makedirs(path_value, exist_ok=True)
+            except Exception as e:
+                logger.warning(f"无法创建目录 {path_value}: {e}")
 
 def get_api_config() -> Dict[str, str]:
     """获取API配置"""

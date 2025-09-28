@@ -129,8 +129,8 @@ class QASimilarityAnalyzer:
                 messages=[
                     {"role": "user", "content": full_prompt}
                 ],
-                temperature=0.1,
-                max_tokens=32768,
+                temperature=get_config('models.llm.temperature', 0.1),
+                max_tokens=get_config('system.token_limits.qa_processing.compaction_tokens', 32768),
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -331,7 +331,7 @@ class QASimilarityAnalyzer:
             self.embedding_calc = None
             self.prefilter = None
 
-    def find_similar_groups(self, qa_pairs: List[QAPair], similarity_threshold: float = 0.75, use_llm: bool = True) -> List[List[QAPair]]:
+    def find_similar_groups(self, qa_pairs: List[QAPair], similarity_threshold: float = None, use_llm: bool = True) -> List[List[QAPair]]:
         """
         将相似的问答对分组 - 支持LLM和传统算法
 
@@ -348,6 +348,14 @@ class QASimilarityAnalyzer:
 
         if len(qa_pairs) == 1:
             return [qa_pairs]
+
+        # 从配置获取默认相似性阈值
+        if similarity_threshold is None:
+            try:
+                from config import get_config
+                similarity_threshold = get_config('system.compaction.knowledge_integration.qa_similarity_threshold', 0.75)
+            except Exception:
+                similarity_threshold = 0.75
 
         try:
             if use_llm:
@@ -790,8 +798,8 @@ class QACompactor:
                 messages=[
                     {"role": "user", "content": full_prompt}
                 ],
-                temperature=0.1,
-                max_tokens=32768,
+                temperature=get_config('models.llm.temperature', 0.1),
+                max_tokens=get_config('system.token_limits.qa_processing.compaction_tokens', 32768),
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -926,7 +934,7 @@ class QACompactor:
 
         return unique_qa_pairs, duplicate_qa_pairs
 
-    def compact_qa_pairs(self, qa_pairs: List[QAPair], similarity_threshold: float = 0.75, use_llm_similarity: bool = True) -> Dict[str, Any]:
+    def compact_qa_pairs(self, qa_pairs: List[QAPair], similarity_threshold: float = None, use_llm_similarity: bool = True) -> Dict[str, Any]:
         """
         压缩问答对列表
 
@@ -940,6 +948,14 @@ class QACompactor:
         """
         start_time = datetime.now()
         original_count = len(qa_pairs)
+
+        # 从配置获取默认相似性阈值
+        if similarity_threshold is None:
+            try:
+                from config import get_config
+                similarity_threshold = get_config('system.compaction.knowledge_integration.qa_similarity_threshold', 0.75)
+            except Exception:
+                similarity_threshold = 0.75
 
         # 确定使用的方法
         if use_llm_similarity and original_count > self.max_full_context_size and self.prefilter:
@@ -1063,11 +1079,19 @@ class CompactionScheduler:
         self.scheduler_thread: Optional[threading.Thread] = None
         self.stop_event = threading.Event()
 
-        # 压缩触发条件
-        self.min_qa_pairs_threshold = 50  # 最少问答对数量才触发压缩
-        self.compression_ratio_threshold = 0.1  # 最小压缩比例才有意义
-        self.min_inactive_buffer_size = 20  # 非活跃缓冲区最小大小才压缩
-        self.max_time_since_last_compaction = 60  # 最大时间间隔（分钟）
+        # 压缩触发条件 - 从配置系统获取
+        try:
+            from config import get_config
+            self.min_qa_pairs_threshold = get_config('system.compaction.qa_compactor.scheduler.min_qa_pairs_threshold', 50)
+            self.compression_ratio_threshold = get_config('system.compaction.qa_compactor.scheduler.compression_ratio_threshold', 0.1)
+            self.min_inactive_buffer_size = get_config('system.compaction.qa_compactor.scheduler.min_inactive_buffer_size', 20)
+            self.max_time_since_last_compaction = get_config('system.compaction.qa_compactor.scheduler.max_time_since_last_compaction', 60)
+        except Exception as e:
+            # 如果配置系统失败，回退到硬编码值以保持向后兼容
+            self.min_qa_pairs_threshold = 50  # 最少问答对数量才触发压缩
+            self.compression_ratio_threshold = 0.1  # 最小压缩比例才有意义
+            self.min_inactive_buffer_size = 20  # 非活跃缓冲区最小大小才压缩
+            self.max_time_since_last_compaction = 60  # 最大时间间隔（分钟）
 
         # 压缩统计
         self.compaction_attempts = 0
@@ -1098,7 +1122,12 @@ class CompactionScheduler:
         self.stop_event.set()
 
         if self.scheduler_thread:
-            self.scheduler_thread.join(timeout=30)
+            try:
+                from config import get_config
+                timeout = get_config('system.endpoints.network.monitor_thread_timeout', 30)
+            except Exception:
+                timeout = 30
+            self.scheduler_thread.join(timeout=timeout)
 
         self.logger.info("压缩调度器已停止")
 
@@ -1188,7 +1217,7 @@ class CompactionScheduler:
                 # 执行压缩（默认使用LLM智能检验）
                 compaction_result = self.compactor.compact_qa_pairs(
                     snapshot.data,
-                    similarity_threshold=0.75,
+                    similarity_threshold=get_config('system.compaction.knowledge_integration.qa_similarity_threshold', 0.75),
                     use_llm_similarity=True
                 )
 

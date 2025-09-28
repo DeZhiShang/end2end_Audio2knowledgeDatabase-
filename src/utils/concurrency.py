@@ -91,7 +91,12 @@ class FileLockManager:
 
                 except (IOError, OSError):
                     # 锁被占用，等待一小段时间后重试
-                    time.sleep(0.1)
+                    try:
+                        from config import get_config
+                        delay = get_config('system.endpoints.delays.concurrency_cleanup_delay', 0.1)
+                    except Exception:
+                        delay = 0.1
+                    time.sleep(delay)
 
             if not acquired:
                 raise TimeoutError(f"获取文件锁超时: {file_path}")
@@ -121,8 +126,16 @@ class FileLockManager:
         with self._lock_registry_lock:
             return list(self._active_locks.values())
 
-    def cleanup_stale_locks(self, max_age_minutes: int = 30):
+    def cleanup_stale_locks(self, max_age_minutes: int = None):
         """清理过期的锁记录"""
+        # 从配置获取最大存活时间
+        if max_age_minutes is None:
+            try:
+                from config import get_config
+                max_age_minutes = get_config('system.concurrency.file_operations.max_age_minutes', 30)
+            except Exception:
+                max_age_minutes = 30
+
         cutoff_time = datetime.now() - timedelta(minutes=max_age_minutes)
         with self._lock_registry_lock:
             stale_locks = [

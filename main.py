@@ -110,7 +110,12 @@ def main():
                     compression_ratio = compaction_stats.get('compression_ratio', 0)
                     logger.info(f"最近压缩比例: {compression_ratio:.2%}")
 
-                logger.info(f"知识库文件: data/output/knowledgeDatabase.md")
+                try:
+                    from config import get_config
+                    knowledge_base_file = get_config('system.paths.knowledge_base_file', 'data/output/knowledgeDatabase.md')
+                except Exception:
+                    knowledge_base_file = "data/output/knowledgeDatabase.md"
+                logger.info(f"知识库文件: {knowledge_base_file}")
                 logger.info("=" * 60)
 
             except Exception as e:

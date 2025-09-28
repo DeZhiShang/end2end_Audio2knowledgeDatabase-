@@ -128,7 +128,12 @@ class SystemMonitor:
         self.stop_event.set()
 
         if self.monitor_thread:
-            self.monitor_thread.join(timeout=30)
+            try:
+                from config import get_config
+                timeout = get_config('system.endpoints.network.monitor_thread_timeout', 30)
+            except Exception:
+                timeout = 30
+            self.monitor_thread.join(timeout=timeout)
 
         self.logger.info("系统监控已停止")
 
