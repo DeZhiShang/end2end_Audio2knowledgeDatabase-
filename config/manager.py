@@ -218,15 +218,111 @@ class ConfigManager:
 
     def _dict_to_dataclass(self, config_dict: Dict[str, Any]) -> AppConfig:
         """将配置字典转换为数据类"""
-        # 简化实现，直接使用字典初始化
-        # 在实际项目中，可能需要更复杂的类型转换逻辑
+        from .schemas.config_schema import (
+            SystemConfig, DeviceConfig, PathConfig, LoggingConfig, MonitoringConfig,
+            ModelConfig, ProcessingConfig, AlgorithmConfig, SimilarityConfig, BusinessConfig
+        )
+
         try:
-            return AppConfig(**config_dict)
-        except Exception:
-            # 如果直接转换失败，使用默认配置并逐个更新
-            app_config = AppConfig()
-            # 这里可以添加更详细的字段映射逻辑
-            return app_config
+            # 递归构建嵌套的dataclass对象
+            kwargs = {}
+
+            # 处理system配置
+            if 'system' in config_dict:
+                system_dict = config_dict['system']
+                system_kwargs = {}
+
+                # 处理device配置
+                if 'device' in system_dict:
+                    system_kwargs['device'] = DeviceConfig(**system_dict['device'])
+
+                # 处理paths配置
+                if 'paths' in system_dict:
+                    system_kwargs['paths'] = PathConfig(**system_dict['paths'])
+
+                # 处理logging配置
+                if 'logging' in system_dict:
+                    system_kwargs['logging'] = LoggingConfig(**system_dict['logging'])
+
+                # 处理monitoring配置
+                if 'monitoring' in system_dict:
+                    system_kwargs['monitoring'] = MonitoringConfig(**system_dict['monitoring'])
+
+                # 处理其他直接字段
+                for key, value in system_dict.items():
+                    if key not in ['device', 'paths', 'logging', 'monitoring']:
+                        system_kwargs[key] = value
+
+                kwargs['system'] = SystemConfig(**system_kwargs)
+
+            # 处理其他顶级配置段，使用对应的Config类
+            for section_name, section_data in config_dict.items():
+                if section_name == 'system':
+                    continue  # 已经处理
+                elif section_name == 'models' and isinstance(section_data, dict):
+                    kwargs['models'] = ModelConfig(**section_data)
+                elif section_name == 'processing' and isinstance(section_data, dict):
+                    # 特殊处理processing配置，只传递支持的参数
+                    processing_kwargs = {}
+                    # ProcessingConfig支持的参数：audio, batch_processing, async_llm, memory_management, progress_tracking, error_handling, performance
+                    supported_fields = ['audio', 'batch_processing', 'async_llm', 'memory_management', 'progress_tracking', 'error_handling', 'performance']
+
+                    for key, value in section_data.items():
+                        if key in supported_fields:
+                            processing_kwargs[key] = value
+                        # 将不支持的字段组织到相应的支持字段下
+                        elif key in ['knowledge_base', 'file_cleanup', 'gleaning']:
+                            # 将这些字段放入audio配置中（或者忽略）
+                            if 'audio' not in processing_kwargs:
+                                processing_kwargs['audio'] = {}
+                            processing_kwargs['audio'][key] = value
+
+                    kwargs['processing'] = ProcessingConfig(**processing_kwargs)
+                elif section_name == 'algorithms' and isinstance(section_data, dict):
+                    # 特殊处理algorithms配置，只传递支持的参数
+                    algorithms_kwargs = {}
+                    # AlgorithmConfig支持的参数：similarity, qa_extraction, knowledge_compression, data_cleaning, quality_control
+                    supported_fields = ['similarity', 'qa_extraction', 'knowledge_compression', 'data_cleaning', 'quality_control']
+
+                    for key, value in section_data.items():
+                        if key in supported_fields:
+                            algorithms_kwargs[key] = value
+                        # 将不支持的字段组织到相应的支持字段下
+                        elif key in ['clustering', 'tokens']:
+                            # 将这些字段放入similarity配置中
+                            if 'similarity' not in algorithms_kwargs:
+                                algorithms_kwargs['similarity'] = {}
+                            algorithms_kwargs['similarity'][key] = value
+
+                    kwargs['algorithms'] = AlgorithmConfig(**algorithms_kwargs)
+                elif section_name == 'business' and isinstance(section_data, dict):
+                    # 特殊处理business配置，只传递支持的参数
+                    business_kwargs = {}
+                    # 先尝试获取BusinessConfig支持的参数，如果不支持就放入通用字段
+                    from inspect import signature
+                    sig = signature(BusinessConfig.__init__)
+                    supported_fields = [p.name for p in sig.parameters.values() if p.name != 'self']
+
+                    for key, value in section_data.items():
+                        if key in supported_fields:
+                            business_kwargs[key] = value
+                        else:
+                            # 如果有通用字段，放入其中；否则忽略
+                            if len(supported_fields) > 0:
+                                first_field = supported_fields[0]
+                                if first_field not in business_kwargs:
+                                    business_kwargs[first_field] = {}
+                                if isinstance(business_kwargs[first_field], dict):
+                                    business_kwargs[first_field][key] = value
+
+                    kwargs['business'] = BusinessConfig(**business_kwargs)
+
+            return AppConfig(**kwargs)
+
+        except Exception as e:
+            self._logger.error(f"Detailed dataclass conversion error: {str(e)}")
+            # 如果转换失败，使用默认配置并继续运行
+            return AppConfig()
 
     @lru_cache(maxsize=128)  # 从配置文件控制
     def get(self, key_path: str, default: Any = None) -> Any:

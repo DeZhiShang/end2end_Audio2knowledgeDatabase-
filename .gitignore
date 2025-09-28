@@ -6,6 +6,10 @@ models/
 
 # Claude配置目录
 .claude/
+
+# Claude Code 开发指南和测试文件
+CLAUDE.md
+tests/
 *.bin
 *.pt
 *.pth
