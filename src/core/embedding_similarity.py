@@ -18,6 +18,8 @@ import time
 
 from src.utils.logger import get_logger
 from src.core.knowledge_base import QAPair
+# 导入配置系统
+from config import get_config
 
 
 @dataclass
@@ -48,22 +50,22 @@ class EmbeddingSimilarityCalculator:
         # 向量维度（qwen3-embedding-8b输出4096维）
         self.embedding_dim = 4096
 
-        # 聚类参数
-        self.min_cluster_size = 2  # HDBSCAN最小簇大小
-        self.min_samples = 2  # 最小样本数
+        # 聚类参数 (从配置系统获取)
+        self.min_cluster_size = get_config('algorithms.clustering.min_cluster_size', 2)
+        self.min_samples = get_config('algorithms.clustering.min_samples', 2)
 
-        # 相似度阈值
-        self.high_similarity_threshold = 0.85  # 高相似度
-        self.medium_similarity_threshold = 0.75  # 中等相似度
-        self.low_similarity_threshold = 0.65  # 低相似度
+        # 相似度阈值 (从配置系统获取)
+        self.high_similarity_threshold = get_config('models.embedding.high_similarity_threshold', 0.85)
+        self.medium_similarity_threshold = get_config('models.embedding.medium_similarity_threshold', 0.75)
+        self.low_similarity_threshold = get_config('models.embedding.low_similarity_threshold', 0.65)
 
-        # 并行处理参数
-        self.parallel_batch_size = 35  # 并行处理的批次大小，基于16384上下文和200tokens/QA优化
-        self.max_workers = 4  # 最大并行工作线程数
+        # 并行处理参数 (从配置系统获取)
+        self.parallel_batch_size = get_config('models.embedding.parallel_batch_size', 35)
+        self.max_workers = get_config('models.embedding.max_workers', 4)
 
-        # Token预估 (每个中文字符约1.3个token)
-        self.avg_qa_tokens = 200  # 平均每个QA对的token数（基于实际数据调整）
-        self.embedding_context_limit = 16384  # embedding模型上下文限制
+        # Token预估 (从配置系统获取)
+        self.avg_qa_tokens = get_config('algorithms.tokens.avg_qa_tokens', 200)
+        self.embedding_context_limit = get_config('algorithms.tokens.embedding_context_limit', 16384)
 
     def get_embeddings_batch(self, texts: List[str], max_retries: int = 3) -> List[Optional[np.ndarray]]:
         """

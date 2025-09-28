@@ -14,33 +14,54 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from src.utils.logger import get_logger
 
+# 导入配置系统
+from config import get_config, get_model_path
+
 
 class ASRProcessor:
     """ASR语音识别处理器"""
 
-    def __init__(self, model_path='/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small'):
+    def __init__(self, model_path=None, device=None, language=None, model_revision=None):
         """
         初始化ASR处理器
 
         Args:
-            model_path: SenseVoice模型路径
+            model_path: SenseVoice模型路径，如果为None则从配置获取
+            device: 计算设备，如果为None则从配置获取
+            language: 识别语言，如果为None则从配置获取
+            model_revision: 模型版本，如果为None则从配置获取
         """
         self.logger = get_logger(__name__)
-        self.model_path = model_path
+
+        # 从配置系统获取参数
+        self.model_path = model_path or get_config('models.asr.model_path', '/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small')
+        self.device = device or get_config('models.asr.device', 'cuda:1')
+        self.language = language or get_config('models.asr.languege', 'zh')  # 保持原始拼写错误
+        self.model_revision = model_revision or get_config('models.asr.model_revision', 'master')
+
         self.inference_pipeline = None
         self._initialize_model()
 
     def _initialize_model(self):
         """初始化SenseVoice推理管线"""
         try:
-            self.inference_pipeline = pipeline(
-                task=Tasks.auto_speech_recognition,
-                model=self.model_path,
-                model_revision="master",
-                device="cuda:1",
-                languege="zh"
-            )
-            self.logger.info("SenseVoice模型加载完成")
+            pipeline_config = {
+                'task': Tasks.auto_speech_recognition,
+                'model': self.model_path,
+                'model_revision': self.model_revision,
+                'device': self.device,
+                'languege': self.language  # 注意：这是原代码中的拼写错误，保持兼容性
+            }
+
+            self.inference_pipeline = pipeline(**pipeline_config)
+
+            self.logger.info(f"SenseVoice模型加载完成",
+                           extra_data={
+                               'model_path': self.model_path,
+                               'device': self.device,
+                               'language': self.language,
+                               'revision': self.model_revision
+                           })
         except Exception as e:
             self.logger.error(f"SenseVoice模型初始化失败: {str(e)}")
             raise

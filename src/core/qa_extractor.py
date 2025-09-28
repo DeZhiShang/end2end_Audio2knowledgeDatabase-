@@ -30,6 +30,8 @@ load_dotenv()
 from src.utils.logger import get_logger
 from src.core.knowledge_base import QAPair, get_knowledge_base
 from src.utils.file_cleaner import get_file_cleaner
+# 导入配置系统
+from config import get_config, get_api_config
 
 
 class QAExtractor:
@@ -48,8 +50,11 @@ class QAExtractor:
         if openai is None:
             raise ImportError("请先安装openai包: pip install openai")
 
-        self.api_key = os.getenv('DASHSCOPE_API_KEY')
-        self.base_url = os.getenv('DASHSCOPE_BASE_URL')
+        # 获取API配置
+        api_config = get_api_config()
+
+        self.api_key = api_config.get('api_key') or os.getenv('DASHSCOPE_API_KEY')
+        self.base_url = api_config.get('api_base') or os.getenv('DASHSCOPE_BASE_URL')
 
         if not self.api_key or not self.base_url:
             raise ValueError("请在.env文件中配置DASHSCOPE_API_KEY和DASHSCOPE_BASE_URL")
@@ -60,7 +65,8 @@ class QAExtractor:
             base_url=self.base_url
         )
 
-        self.model_name = "qwen-plus-latest"
+        # 从配置系统获取模型配置
+        self.model_name = get_config('models.llm.model_name', 'qwen-plus-latest')
 
         # 获取知识库实例
         self.knowledge_base = get_knowledge_base()

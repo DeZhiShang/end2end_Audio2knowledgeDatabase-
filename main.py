@@ -21,6 +21,9 @@ warnings.filterwarnings("ignore", message=".*std().*degrees of freedom.*")
 # 设置环境变量减少一些库的输出
 os.environ['PYTHONWARNINGS'] = 'ignore'
 
+# 导入配置系统
+from config import get_config, diagnose_config
+
 from src.utils.processor import AudioProcessor
 from src.utils.logger import get_logger
 import signal
@@ -43,16 +46,28 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    logger.info("端到端音频处理系统 (知识库集成版)")
+    logger.info("端到端音频处理系统 (知识库集成版) - 统一配置系统")
     logger.info("流程: MP3音频 → WAV转换 → 说话人分离 → 切分子音频 → ASR语音识别 → [异步]Gleaning多轮清洗 → 问答对抽取 → 高质量知识库")
     logger.info("=" * 100)
 
-    # 创建音频处理器（启用异步LLM和知识库）
-    processor = AudioProcessor(
-        enable_async_llm=True,      # 启用异步LLM处理
-        max_concurrent_llm=4,       # 最大并发LLM任务数
-        enable_knowledge_base=True  # 启用知识库集成
-    )
+    # 显示配置信息（调试模式）
+    if get_config('system.logging.level') == 'DEBUG':
+        logger.info("配置系统诊断信息:")
+        diagnose_config()
+
+    # 创建音频处理器（使用配置系统的默认值）
+    processor = AudioProcessor()
+
+    # 记录实际使用的配置
+    logger.info(f"配置信息:")
+    logger.info(f"  - 异步LLM处理: {processor.enable_async_llm}")
+    logger.info(f"  - 最大并发LLM任务: {processor.max_concurrent_llm}")
+    logger.info(f"  - 知识库集成: {processor.enable_knowledge_base}")
+    logger.info(f"  - 自动清理: {processor.enable_auto_cleanup}")
+    logger.info(f"  - Gleaning多轮清洗: {processor.enable_gleaning} (最大轮数: {processor.max_gleaning_rounds})")
+    logger.info(f"  - 设备: {get_config('system.device.cuda_device')}")
+    logger.info(f"  - 环境: {get_config('_environment', '未知')}")
+    logger.info("=" * 100)
 
     try:
         # 执行批量处理（包含MP3转WAV预处理）

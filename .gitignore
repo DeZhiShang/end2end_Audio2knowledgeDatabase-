@@ -76,6 +76,11 @@ secrets.json
 .env.local
 .env.production
 
+# 本地配置文件覆盖
+config/local/*.yaml
+config/local/*.yml
+config/local/*.json
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

@@ -1,0 +1,26 @@
+# 处理配置 - 基于原项目真实的硬编码配置
+# 只包含原项目中实际存在的配置项
+
+async_llm:
+  # 异步LLM处理配置 (从AudioProcessor.__init__提取)
+  enable_async: true
+  max_concurrent_llm: 4
+
+knowledge_base:
+  # 知识库处理配置 (从AudioProcessor.__init__提取)
+  enable_knowledge_base: true
+
+file_cleanup:
+  # 文件清理配置 (从AudioProcessor.__init__提取)
+  enable_auto_cleanup: true
+  cleanup_dry_run: false
+
+gleaning:
+  # Gleaning机制配置 (从AudioProcessor.__init__提取)
+  enable_gleaning: true
+  max_gleaning_rounds: 3
+
+batch_processing:
+  # 批处理配置 (从QACompactor模块提取)
+  batch_size: 50                # 单批次最佳大小
+  max_full_context_size: 100    # 全量分析的最大规模

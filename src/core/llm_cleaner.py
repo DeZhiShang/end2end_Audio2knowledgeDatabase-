@@ -23,6 +23,8 @@ except ImportError:
 load_dotenv()
 
 from src.utils.logger import get_logger
+# 导入配置系统
+from config import get_config, get_api_config
 
 
 class LLMDataCleaner:
@@ -35,8 +37,11 @@ class LLMDataCleaner:
         if openai is None:
             raise ImportError("请先安装openai包: pip install openai")
 
-        self.api_key = os.getenv('DASHSCOPE_API_KEY')
-        self.base_url = os.getenv('DASHSCOPE_BASE_URL')
+        # 获取API配置
+        api_config = get_api_config()
+
+        self.api_key = api_config.get('api_key') or os.getenv('DASHSCOPE_API_KEY')
+        self.base_url = api_config.get('api_base') or os.getenv('DASHSCOPE_BASE_URL')
 
         if not self.api_key or not self.base_url:
             raise ValueError("请在.env文件中配置DASHSCOPE_API_KEY和DASHSCOPE_BASE_URL")
@@ -47,11 +52,12 @@ class LLMDataCleaner:
             base_url=self.base_url
         )
 
-        self.model_name = "qwen-plus-latest"
+        # 从配置系统获取模型配置
+        self.model_name = get_config('models.llm.model_name', 'qwen-plus-latest')
 
-        # Gleaning机制配置
-        self.max_gleaning_rounds = 3  # 最大清洗轮数
-        self.quality_threshold = 0.90  # 质量阈值(0-1)
+        # Gleaning机制配置 (从配置系统获取)
+        self.max_gleaning_rounds = get_config('processing.gleaning.max_gleaning_rounds', 3)
+        self.quality_threshold = get_config('models.llm.quality_threshold', 0.90)
         # 移除最小改进阈值限制，以质量达标为准
 
 

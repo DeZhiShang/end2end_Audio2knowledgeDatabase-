@@ -1,0 +1,36 @@
+# 模型配置 - 基于原项目真实的硬编码配置
+# 只包含原项目中实际存在的配置项
+
+speaker_diarization:
+  # 说话人分离模型配置 (从SpeakerDiarization类提取)
+  model_name: "pyannote/speaker-diarization-3.1"
+  device: "cuda:1"
+  num_speakers: 2  # process方法默认值
+
+asr:
+  # 语音识别模型配置 (从ASRProcessor类提取)
+  model_path: "/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small"
+  device: "cuda:1"
+  model_revision: "master"
+  languege: "zh"  # 注意：保持原项目中的拼写错误
+
+llm:
+  # LLM配置 (从各个模块中的实际使用提取)
+  model_name: "qwen-plus-latest"  # 在多个模块中使用的模型名称
+  temperature: 0.1  # 在multiple模块中使用
+  quality_threshold: 0.90  # LLMDataCleaner中的质量阈值
+
+  # 不同任务的max_tokens配置
+  max_tokens_evaluation: 1000    # LLMDataCleaner evaluation
+  max_tokens_gleaning: 4000      # LLMDataCleaner gleaning
+  max_tokens_qa_extraction: 32768  # QAExtractor
+
+embedding:
+  # 向量化配置 (从EmbeddingSimilarity模块提取)
+  parallel_batch_size: 35  # 并行处理批次大小
+  max_workers: 4          # 最大并行工作线程数
+
+  # 相似度阈值配置
+  high_similarity_threshold: 0.85
+  medium_similarity_threshold: 0.75
+  low_similarity_threshold: 0.65

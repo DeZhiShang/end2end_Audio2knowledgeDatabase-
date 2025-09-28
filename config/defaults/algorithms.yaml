@@ -1,0 +1,12 @@
+# 算法配置 - 基于原项目真实的硬编码配置
+# 只包含原项目中实际存在的配置项
+
+clustering:
+  # 聚类参数 (从EmbeddingSimilarity模块提取)
+  min_cluster_size: 2  # HDBSCAN最小簇大小
+  min_samples: 2       # 最小样本数
+
+tokens:
+  # Token相关配置 (从EmbeddingSimilarity模块提取)
+  avg_qa_tokens: 200      # 平均每个QA对的token数
+  embedding_context_limit: 16384  # embedding模型上下文限制

@@ -1,0 +1,12 @@
+# 本地配置文件目录
+# 此目录用于存放用户的本地配置覆盖文件
+# 这些文件应该被git忽略，不会被提交到版本控制
+
+# 使用示例:
+# 1. 复制对应的默认配置文件到此目录
+# 2. 修改需要覆盖的配置项
+# 3. 配置管理器会自动加载并合并这些配置
+
+# 例如：
+# cp config/defaults/system.yaml config/local/system.yaml
+# 然后编辑 config/local/system.yaml 中需要修改的配置项

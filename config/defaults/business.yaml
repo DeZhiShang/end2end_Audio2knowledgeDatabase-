@@ -1,0 +1,17 @@
+# 业务配置 - 基于原项目真实的业务信息
+# 从src/core/prompt.py模块提取的实际业务配置
+
+product:
+  # 产品信息 (从prompt模板中提取)
+  name: "博邦方舟无创血糖仪"
+  category: "非侵入式血糖检测设备"
+
+conversation:
+  # 对话场景配置 (从prompt模板中提取)
+  scenario: "博邦方舟无创血糖仪客服与用户的电话咨询"
+  language: "中文"  # 全部为中文对话
+
+data_source:
+  # 数据来源信息 (从prompt模板中提取)
+  diarization: "pyannote说话人分离"
+  asr: "SenseVoice ASR语音识别"

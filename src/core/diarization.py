@@ -8,70 +8,88 @@ import os
 # 过滤相关警告
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# 自动加载.env文件中的环境变量
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    # 如果没有安装python-dotenv，忽略错误
-    pass
-
 from pyannote.audio import Pipeline
 import torch
 import torchaudio
 from src.utils.logger import get_logger
 
+# 导入配置系统
+from config import get_config
+
 
 class SpeakerDiarization:
     """说话人分离处理器"""
 
-    def __init__(self, model_name="pyannote/speaker-diarization-3.1",
-                 auth_token=None,
-                 device="cuda:1"):
+    def __init__(self, model_name=None, auth_token=None, device=None, num_speakers=None):
         """
         初始化说话人分离模型
 
         Args:
-            model_name: 模型名称
-            auth_token: HuggingFace访问令牌，如果为None则从环境变量HUGGINGFACE_TOKEN获取
-            device: 计算设备
+            model_name: 模型名称，如果为None则从配置获取
+            auth_token: HuggingFace访问令牌，如果为None则从配置获取
+            device: 计算设备，如果为None则从配置获取
+            num_speakers: 默认说话人数量，如果为None则从配置获取
         """
         self.logger = get_logger(__name__)
 
-        # 如果未提供token，从环境变量获取
+        # 从配置系统获取参数
+        self.model_name = model_name or get_config('models.speaker_diarization.model_name', 'pyannote/speaker-diarization-3.1')
+        self.device = device or get_config('models.speaker_diarization.device', 'cuda:1')
+        self.num_speakers = num_speakers or get_config('models.speaker_diarization.num_speakers', 2)
+
+        # 获取认证token
         if auth_token is None:
-            auth_token = os.getenv('HUGGINGFACE_TOKEN')
+            auth_token = get_config('system.environment.huggingface_token') or os.getenv('HUGGINGFACE_TOKEN')
             if auth_token is None:
-                raise ValueError("请设置环境变量 HUGGINGFACE_TOKEN 或在初始化时提供 auth_token 参数")
+                self.logger.warning("未配置HUGGINGFACE_TOKEN，可能无法下载某些模型")
 
-        self.pipeline = Pipeline.from_pretrained(
-            model_name,
-            # use_auth_token=auth_token
-        )
-        self.pipeline.to(torch.device(device))
-        self.logger.info(f"说话人分离模型已加载到 {device}", extra_data={'device': device, 'model': model_name})
+        # 初始化模型
+        try:
+            self.pipeline = Pipeline.from_pretrained(
+                self.model_name,
+                # use_auth_token=auth_token  # 如果需要token，取消注释
+            )
+            self.pipeline.to(torch.device(self.device))
+            self.logger.info(f"说话人分离模型已加载到 {self.device}",
+                           extra_data={'device': self.device, 'model': self.model_name})
+        except Exception as e:
+            self.logger.error(f"模型加载失败: {str(e)}")
+            raise
 
-    def process(self, wav_file, num_speakers=2):
+    def process(self, wav_file, num_speakers=None):
         """
         执行说话人分离
 
         Args:
             wav_file: 音频文件路径
-            num_speakers: 说话人数量
+            num_speakers: 说话人数量，如果为None则使用实例默认值或自动检测
 
         Returns:
             diarization: 分离结果对象
         """
-        # 加载音频文件
-        waveform, sample_rate = torchaudio.load(wav_file)
+        # 使用传入的参数或实例默认值
+        effective_num_speakers = num_speakers or self.num_speakers
 
-        # 执行说话人分离
-        diarization = self.pipeline(
-            {"waveform": waveform, "sample_rate": sample_rate},
-            num_speakers=num_speakers
-        )
+        try:
+            # 加载音频文件
+            waveform, sample_rate = torchaudio.load(wav_file)
 
-        return diarization
+            # 构建输入参数
+            audio_input = {"waveform": waveform, "sample_rate": sample_rate}
+            pipeline_kwargs = {}
+
+            if effective_num_speakers is not None:
+                pipeline_kwargs["num_speakers"] = effective_num_speakers
+
+            # 执行说话人分离
+            self.logger.debug(f"开始说话人分离: {wav_file}, 参数: {pipeline_kwargs}")
+            diarization = self.pipeline(audio_input, **pipeline_kwargs)
+
+            return diarization
+
+        except Exception as e:
+            self.logger.error(f"说话人分离失败: {wav_file}, 错误: {str(e)}")
+            raise
 
     def save_rttm(self, diarization, rttm_file):
         """

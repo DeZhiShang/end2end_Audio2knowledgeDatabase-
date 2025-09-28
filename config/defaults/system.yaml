@@ -1,0 +1,19 @@
+# 系统配置 - 基于原项目真实的硬编码配置
+# 只包含原项目中实际存在的配置项
+
+device:
+  # 原项目中设备配置 (cuda:1 在多个模块中硬编码)
+  cuda_device: "cuda:1"  # SpeakerDiarization, ASRProcessor, AudioConverter 默认设备
+
+paths:
+  # 原项目中的路径配置
+  project_root: "."
+
+  # 模型路径 (从ASRProcessor硬编码路径提取)
+  sensevoice_model: "/home/dzs-ai-4/dzs-dev/end2end_autio2kg/models/senseVoice-small"
+
+environment:
+  # 环境变量配置 (从原项目代码中提取)
+  huggingface_token_var: "HUGGINGFACE_TOKEN"
+  dashscope_api_key_var: "DASHSCOPE_API_KEY"
+  dashscope_base_url_var: "DASHSCOPE_BASE_URL"

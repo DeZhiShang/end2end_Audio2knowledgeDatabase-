@@ -5,7 +5,7 @@
 
 import os
 import glob
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from src.core.diarization import SpeakerDiarization
 from src.core.audio_segmentation import AudioSegmentation
 from src.utils.audio_converter import AudioConverter
@@ -18,22 +18,47 @@ import atexit
 # 知识库集成模块
 from src.core.knowledge_integration import get_knowledge_processor, cleanup_knowledge_processor
 
+# 导入配置系统
+from config import get_config
+
 
 class AudioProcessor:
     """音频处理器：管理端到端的音频处理流程"""
 
-    def __init__(self, enable_async_llm: bool = True, max_concurrent_llm: int = 4, enable_knowledge_base: bool = True, enable_auto_cleanup: bool = True, cleanup_dry_run: bool = False):
+    def __init__(self,
+                 enable_async_llm: Optional[bool] = None,
+                 max_concurrent_llm: Optional[int] = None,
+                 enable_knowledge_base: Optional[bool] = None,
+                 enable_auto_cleanup: Optional[bool] = None,
+                 cleanup_dry_run: Optional[bool] = None,
+                 enable_gleaning: Optional[bool] = None,
+                 max_gleaning_rounds: Optional[int] = None):
         """
         初始化处理器
 
         Args:
-            enable_async_llm: 是否启用异步LLM处理
-            max_concurrent_llm: 最大并发LLM任务数
-            enable_knowledge_base: 是否启用知识库集成
-            enable_auto_cleanup: 是否启用自动清理中间文件
-            cleanup_dry_run: 是否为清理干运行模式
+            enable_async_llm: 是否启用异步LLM处理，如果为None则从配置获取
+            max_concurrent_llm: 最大并发LLM任务数，如果为None则从配置获取
+            enable_knowledge_base: 是否启用知识库集成，如果为None则从配置获取
+            enable_auto_cleanup: 是否启用自动清理中间文件，如果为None则从配置获取
+            cleanup_dry_run: 是否为清理干运行模式，如果为None则从配置获取
+            enable_gleaning: 是否启用gleaning多轮清洗，如果为None则从配置获取
+            max_gleaning_rounds: 最大清洗轮数，如果为None则从配置获取
         """
         self.logger = get_logger(__name__)
+
+        # 从配置系统获取参数
+        self.enable_async_llm = enable_async_llm if enable_async_llm is not None else get_config('processing.async_llm.enable_async', True)
+        self.max_concurrent_llm = max_concurrent_llm or get_config('processing.async_llm.max_concurrent_llm', 4)
+        self.enable_knowledge_base = enable_knowledge_base if enable_knowledge_base is not None else get_config('processing.knowledge_base.enable_knowledge_base', True)
+        self.enable_auto_cleanup = enable_auto_cleanup if enable_auto_cleanup is not None else get_config('processing.file_cleanup.enable_auto_cleanup', True)
+        self.cleanup_dry_run = cleanup_dry_run if cleanup_dry_run is not None else get_config('processing.file_cleanup.cleanup_dry_run', False)
+
+        # Gleaning机制配置
+        self.enable_gleaning = enable_gleaning if enable_gleaning is not None else get_config('processing.gleaning.enable_gleaning', True)
+        self.max_gleaning_rounds = max_gleaning_rounds or get_config('processing.gleaning.max_gleaning_rounds', 3)
+
+        # 初始化核心组件
         self.converter = AudioConverter()
         self.diarizer = SpeakerDiarization()
         self.segmenter = AudioSegmentation()
@@ -41,22 +66,11 @@ class AudioProcessor:
         self.llm_cleaner = None  # 延迟初始化LLM清洗器
 
         # 异步LLM处理配置
-        self.enable_async_llm = enable_async_llm
         self.async_llm_processor = None
         self.submitted_llm_tasks = {}  # 跟踪提交的异步LLM任务
 
-        # Gleaning机制配置
-        self.enable_gleaning = True  # 默认启用gleaning多轮清洗
-        self.max_gleaning_rounds = 3  # 最大清洗轮数
-        # 注意：质量阈值由LLMDataCleaner管理，避免重复配置
-
         # 知识库集成配置
-        self.enable_knowledge_base = enable_knowledge_base
         self.knowledge_processor = None  # 延迟初始化知识处理器
-
-        # 文件清理配置
-        self.enable_auto_cleanup = enable_auto_cleanup
-        self.cleanup_dry_run = cleanup_dry_run
 
         # 初始化异步LLM处理器
         if self.enable_async_llm:
