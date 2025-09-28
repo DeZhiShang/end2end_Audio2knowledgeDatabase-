@@ -156,7 +156,7 @@ class QAExtractor:
                     {"role": "user", "content": full_prompt}
                 ],
                 temperature=get_config('models.llm.temperature', 0.1),
-                max_tokens=get_config('system.token_limits.qa_processing.extraction_tokens', 32768),  # 足够的token数量
+                max_tokens=get_config('models.llm.max_tokens_qa_extraction', 32768),  # 足够的token数量
             )
 
             result_text = response.choices[0].message.content.strip()

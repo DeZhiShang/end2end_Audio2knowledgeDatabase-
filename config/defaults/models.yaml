@@ -21,9 +21,10 @@ llm:
   quality_threshold: 0.90  # LLMDataCleaner中的质量阈值
 
   # 不同任务的max_tokens配置
-  max_tokens_evaluation: 1000    # LLMDataCleaner evaluation
-  max_tokens_gleaning: 4000      # LLMDataCleaner gleaning
-  max_tokens_qa_extraction: 32768  # QAExtractor
+  max_tokens_evaluation: 1000    # LLMDataCleaner evaluation (check_tokens)
+  max_tokens_gleaning: 4000      # LLMDataCleaner gleaning (clean_tokens)
+  max_tokens_qa_extraction: 32768  # QAExtractor (extraction_tokens)
+  max_tokens_qa_compaction: 32768  # QACompactor (compaction_tokens)
 
 embedding:
   # 向量化配置 (从EmbeddingSimilarity模块提取)

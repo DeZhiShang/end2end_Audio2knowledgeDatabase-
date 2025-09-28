@@ -104,7 +104,7 @@ class LLMDataCleaner:
                 model=self.model_name,
                 messages=[{"role": "user", "content": evaluation_prompt}],
                 temperature=get_config('models.llm.temperature', 0.1),
-                max_tokens=get_config('system.token_limits.llm_cleaning.check_tokens', 1000),
+                max_tokens=get_config('models.llm.max_tokens_evaluation', 1000),
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -230,7 +230,7 @@ class LLMDataCleaner:
                     model=self.model_name,
                     messages=[{"role": "user", "content": gleaning_prompt}],
                     temperature=get_config('models.llm.temperature', 0.1),
-                    max_tokens=get_config('system.token_limits.llm_cleaning.clean_tokens', 4000),
+                    max_tokens=get_config('models.llm.max_tokens_gleaning', 4000),
                 )
 
                 round_result = response.choices[0].message.content.strip()
@@ -335,7 +335,7 @@ class LLMDataCleaner:
                     {"role": "user", "content": full_prompt}
                 ],
                 temperature=get_config('models.llm.temperature', 0.1),  # 较低的温度确保稳定输出
-                max_tokens=get_config('system.token_limits.llm_cleaning.clean_tokens', 4000),  # 足够的token数量
+                max_tokens=get_config('models.llm.max_tokens_gleaning', 4000),  # 足够的token数量
             )
 
             cleaned_content = response.choices[0].message.content.strip()
