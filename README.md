@@ -133,6 +133,14 @@ python main.py
 # Final knowledge base file: data/output/knowledgeDatabase.md
 ```
 
+### Example Demonstration
+
+**Input Data Example**:
+![Input Example](images/input_example.png)
+
+**Output Data Example**:
+![Output Example](images/ouput_example.png)
+
 ## 📁 Project Structure
 
 ```
@@ -501,7 +509,7 @@ This project adopts the [MIT License](LICENSE) open source protocol.
 
 **DezSmart Medical Technology Co., Ltd. Technical Team**
 
-- 📧 **Contact Email**: huangsuxiang5@gmail.com
+- 📧 **Contact Email**: ericsenyao@163.com
 - 🏢 **Company**: DezSmart Medical Technology Co., Ltd.
 
 ## 🙏 Acknowledgments
@@ -518,7 +526,7 @@ Thanks to the following open source projects and technical communities for their
 For technical support or business cooperation, please contact us through:
 
 - **Technical Issues**: Submit on GitHub Issues
-- **Business Cooperation**: huangsuxiang5@gmail.com
+- **Business Cooperation**: ericsenyao@163.com
 - **Documentation Contribution**: Welcome to submit PRs for documentation improvements
 
 ---
