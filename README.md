@@ -1,286 +1,284 @@
-[English](README.md) | [简体中文](README.zh-CN.md)
+# 端到端客服录音知识库提取系统
 
-# End-to-End Customer Service Audio Knowledge Base Extraction System
+> 🎯 企业级批量MP3录音转高质量知识库的端到端解决方案
 
-> 🎯 Enterprise-grade batch MP3 audio to high-quality knowledge base end-to-end solution
+一个专为客服场景设计的音频处理系统，能够将大量客服对话录音批量转换为结构化的高质量知识库语料，为RAG智能客服提供可靠的数据基础。
 
-An audio processing system designed specifically for customer service scenarios that can batch convert large amounts of customer service dialogue recordings into structured high-quality knowledge base corpus, providing reliable data foundation for RAG intelligent customer service.
+## ⚡ 核心亮点
 
-## ⚡ Core Highlights
+### 🎯 解决实际业务痛点
+- **端到端批量处理**：一键处理大量MP3录音文件，无需人工干预
+- **企业级架构**：统一配置管理、异步处理、智能资源管理
+- **高质量输出**：通过多轮清洗和智能压缩，确保知识库质量
 
-### 🎯 Solving Real Business Pain Points
-- **End-to-End Batch Processing**: One-click processing of large amounts of MP3 recording files without manual intervention
-- **Enterprise-Grade Architecture**: Unified configuration management, asynchronous processing, intelligent resource management
-- **High-Quality Output**: Ensuring knowledge base quality through multi-round cleaning and intelligent compression
+### 🚀 技术创新特性
+- **Gleaning多轮清洗机制**：LLM驱动的迭代优化，显著提升文本质量
+- **异步LLM处理器**：支持高并发处理，大幅提升处理效率
+- **双缓存压缩系统**：智能压缩算法，避免知识库无限膨胀
+- **防灾难性遗忘**：创新的增量压缩机制，保持知识库一致性
+- **自动资源管理**：动态清理中间文件，确保系统资源可控
 
-### 🚀 Technical Innovation Features
-- **Gleaning Multi-Round Cleaning Mechanism**: LLM-driven iterative optimization, significantly improving text quality
-- **Asynchronous LLM Processor**: Supporting high-concurrency processing, dramatically improving processing efficiency
-- **Dual-Cache Compression System**: Smart compression algorithms preventing unlimited knowledge base expansion
-- **Catastrophic Forgetting Prevention**: Innovative incremental compression mechanism maintaining knowledge base consistency
-- **Automatic Resource Management**: Dynamic cleanup of intermediate files ensuring controllable system resources
+### 🎨 处理流程优势
+与传统ASR方案相比，本系统专门优化了：
+- **强噪声环境**：客服录音的复杂声学环境处理
+- **角色识别清晰**：精确的说话人分离和对话还原
+- **完整工作流**：填补市场空白的端到端开源解决方案
 
-### 🎨 Processing Pipeline Advantages
-Compared to traditional ASR solutions, this system specifically optimizes:
-- **High-Noise Environments**: Complex acoustic environment processing of customer service recordings
-- **Clear Role Identification**: Precise speaker separation and dialogue restoration
-- **Complete Workflow**: End-to-end open-source solution filling market gaps
+## 📋 系统架构
 
-## 📋 System Architecture
-
-### End-to-End Processing Pipeline
+### 端到端处理流程
 
 ```
-Original MP3 Audio
-    ↓ [Audio Format Conversion]
-WAV Standard Format Audio
-    ↓ [Speaker Separation - pyannote-3.1]
-RTTM Timestamp Files
-    ↓ [Audio Segment Splitting - torchaudio]
-Speaker-Separated Audio Segments
-    ↓ [Speech Recognition - SenseVoice-Small]
-Raw ASR Text
-    ↓ [Multi-Round LLM Cleaning - qwen-plus]
-High-Quality Dialogue Corpus
-    ↓ [Q&A Pair Extraction]
-Structured Q&A Pairs
-    ↓ [Intelligent Compression System]
-High-Quality Knowledge Base
+原始MP3录音
+    ↓ [音频格式转换]
+WAV标准格式音频
+    ↓ [说话人分离 - pyannote-3.1]
+RTTM时间戳文件
+    ↓ [音频片段切分 - torchaudio]
+按说话人分割的音频片段
+    ↓ [语音识别 - SenseVoice-Small]
+原始ASR文本
+    ↓ [多轮LLM清洗 - qwen-plus]
+高质量对话语料
+    ↓ [问答对提取]
+结构化QA对
+    ↓ [智能压缩系统]
+高质量知识库
 ```
 
-### Core Technology Stack
+### 核心技术栈
 
-#### 🧠 AI Model Layer
-- **Speaker Separation**: `pyannote/speaker-diarization-3.1` - Deep learning-based precise speaker identification
-- **Speech Recognition**: `SenseVoice-Small` - Alibaba open-source multilingual ASR model, locally deployed
-- **Text Processing**: `qwen-plus-latest` - Alibaba Cloud Tongyi Qianwen large language model
+#### 🧠 AI模型层
+- **说话人分离**：`pyannote/speaker-diarization-3.1` - 基于深度学习的精确说话人识别
+- **语音识别**：`SenseVoice-Small` - 阿里开源多语言ASR模型，本地部署
+- **文本处理**：`qwen-plus-latest` - 阿里云通义千问大语言模型
 
-#### 🏗️ System Architecture Layer
-- **Configuration Management**: Layered YAML configuration system supporting multi-environment deployment
-- **Concurrent Processing**: ThreadPoolExecutor-based asynchronous task scheduling
-- **Audio Processing**: PyTorch ecosystem torchaudio audio processing library
-- **Intelligent Compression**: LLM-driven similarity verification and knowledge merging
+#### 🏗️ 系统架构层
+- **配置管理**：分层YAML配置系统，支持多环境部署
+- **并发处理**：基于ThreadPoolExecutor的异步任务调度
+- **音频处理**：PyTorch生态的torchaudio音频处理库
+- **智能压缩**：LLM驱动的相似度检验和知识合并
 
-#### 📊 Data Processing Layer
-- **Format Conversion**: Intelligent audio format detection and conversion
-- **Precise Splitting**: Millisecond-level audio segmentation based on RTTM timestamps
-- **Quality Control**: Multi-round Gleaning cleaning and quality assessment
-- **Knowledge Construction**: Structured Q&A pair extraction and hierarchical organization
+#### 📊 数据处理层
+- **格式转换**：智能音频格式检测和转换
+- **精确切分**：基于RTTM时间戳的毫秒级音频分割
+- **质量控制**：多轮Gleaning清洗和质量评估
+- **知识构建**：结构化QA对提取和层次化组织
 
-## 🛠️ Quick Start
+## 🛠️ 快速开始
 
-### Environment Requirements
+### 环境要求
 
 - **Python**: 3.12
-- **GPU**: CUDA-compatible graphics card (GTX 1080+ recommended, theoretically pyannote+senseVoice requires ~2GB VRAM)
-- **Memory**: 16GB+ RAM (32GB recommended)
-- **Storage**: 50GB+ available space
+- **GPU**: CUDA兼容显卡 (推荐GTX 1080以上，理论上pyannote+senseVoice需约2GB显存)
+- **内存**: 16GB+ RAM (推荐32GB)
+- **存储**: 50GB+ 可用空间
 
-### Installation Steps
+### 安装步骤
 
-1. **Clone the Project**
+1. **克隆项目**
 ```bash
 git clone <repository-url>
 cd end2end_autio2kg
 ```
 
-2. **Install Dependencies**
+2. **安装依赖**
 ```bash
-# Install PyTorch (CUDA version)
-pip install torch torchvision torchaudio
+# 安装PyTorch (CUDA版本)
+pip install torch torchvision torchaudio 
 
-# Install project dependencies
+# 安装项目依赖
 pip install -r requirements.txt
 ```
 
-3. **Configure Environment Variables**
+3. **配置环境变量**
 ```bash
 cp .env.example .env
-# Edit the .env file to configure necessary API keys
+# 编辑 .env 文件，配置必要的API密钥
 ```
 
-Required configurations:
+必需配置：
 ```bash
-# Hugging Face access token (for pyannote model)
+# Hugging Face访问令牌 (用于pyannote模型)
 HUGGINGFACE_TOKEN=hf_your_token_here
 
-# Alibaba Cloud API configuration (for LLM cleaning)
+# 阿里云API配置 (用于LLM清洗)
 DASHSCOPE_API_KEY=sk-your_api_key_here
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-4. **Prepare Models**
+4. **准备模型**
 ```bash
-# SenseVoice model will be automatically downloaded to models/senseVoice-small/ on first run
+# SenseVoice模型会在首次运行时自动下载到 models/senseVoice-small/
 ```
 
-### Running the System
+### 运行系统
 
-1. **Place Audio Files**
+1. **放置音频文件**
 ```bash
-# Place MP3 files in the data/input/ directory
+# 将MP3文件放入 data/input/ 目录
 cp your_recordings/*.mp3 data/input/
 ```
 
-2. **Start Processing**
+2. **启动处理**
 ```bash
 python main.py
 ```
 
-3. **View Results**
+3. **查看结果**
 ```bash
-# Processing results will be saved in the data/output/ directory
-# Final knowledge base file: data/output/knowledgeDatabase.md
+# 处理结果会保存在 data/output/ 目录
+# 最终知识库文件：data/output/knowledgeDatabase.md
 ```
 
-### Example Demonstration
+### 示例展示
 
-**Input Data Example**:
-![Input Example](images/input_example.png)
+**输入数据示例**:
+![输入示例](images/input_example.png)
 
-**Output Data Example**:
-![Output Example](images/ouput_example.png)
+**输出数据示例**:
+![输出示例](images/ouput_example.png)
 
-## 📁 Project Structure
+## 📁 项目结构
 
 ```
 end2end_autio2kg/
-├── main.py                     # Main program entry
-├── requirements.txt            # Project dependencies
-├── .env.example               # Environment variable template
+├── main.py                     # 主程序入口
+├── requirements.txt            # 项目依赖
+├── .env.example               # 环境变量模板
 │
-├── config/                    # 🔧 Unified configuration management system
-│   ├── manager.py             # Configuration manager core
-│   ├── schemas/               # Configuration schema definitions
-│   ├── defaults/              # Default configuration files
-│   │   ├── system.yaml        # System configuration
-│   │   ├── models.yaml        # Model configuration
-│   │   ├── processing.yaml    # Processing configuration
-│   │   ├── compaction.yaml    # Compression configuration
-│   │   ├── concurrency.yaml   # Concurrency configuration
-│   │   ├── algorithms.yaml    # Algorithm configuration
-│   │   └── business.yaml      # Business configuration
-│   ├── environments/          # Environment-specific configuration
-│   └── local/                 # Local override configuration
+├── config/                    # 🔧 统一配置管理系统
+│   ├── manager.py             # 配置管理器核心
+│   ├── schemas/               # 配置模式定义
+│   ├── defaults/              # 默认配置文件
+│   │   ├── system.yaml        # 系统配置
+│   │   ├── models.yaml        # 模型配置
+│   │   ├── processing.yaml    # 处理配置
+│   │   ├── compaction.yaml    # 压缩配置
+│   │   ├── concurrency.yaml   # 并发配置
+│   │   ├── algorithms.yaml    # 算法配置
+│   │   └── business.yaml      # 业务配置
+│   ├── environments/          # 环境特定配置
+│   └── local/                 # 本地覆盖配置
 │
-├── src/                       # 🧩 Core source code
-│   ├── core/                  # Core processing modules
-│   │   ├── diarization.py     # Speaker separation
-│   │   ├── audio_segmentation.py # Audio segmentation
-│   │   ├── asr.py             # Speech recognition
-│   │   ├── llm_cleaner.py     # LLM data cleaning
-│   │   ├── async_llm_processor.py # Asynchronous LLM processor
-│   │   ├── qa_extractor.py    # Q&A extractor
-│   │   ├── qa_compactor.py    # Q&A compactor
-│   │   ├── knowledge_base.py  # Knowledge base management (dual-cache system)
-│   │   ├── knowledge_integration.py # Knowledge base integration
-│   │   └── embedding_similarity.py # Similarity calculation
-│   └── utils/                 # Utility modules
-│       ├── audio_converter.py # Audio format conversion
-│       ├── processor.py       # Unified processor
-│       ├── logger.py          # Log management
-│       ├── concurrency.py     # Concurrency control
-│       └── file_cleaner.py    # File cleanup tool
+├── src/                       # 🧩 核心源代码
+│   ├── core/                  # 核心处理模块
+│   │   ├── diarization.py     # 说话人分离
+│   │   ├── audio_segmentation.py # 音频切分
+│   │   ├── asr.py             # 语音识别
+│   │   ├── llm_cleaner.py     # LLM数据清洗
+│   │   ├── async_llm_processor.py # 异步LLM处理器
+│   │   ├── qa_extractor.py    # QA提取器
+│   │   ├── qa_compactor.py    # QA压缩器
+│   │   ├── knowledge_base.py  # 知识库管理 (双缓存系统)
+│   │   ├── knowledge_integration.py # 知识库集成
+│   │   └── embedding_similarity.py # 相似度计算
+│   └── utils/                 # 工具模块
+│       ├── audio_converter.py # 音频格式转换
+│       ├── processor.py       # 统一处理器
+│       ├── logger.py          # 日志管理
+│       ├── concurrency.py     # 并发控制
+│       └── file_cleaner.py    # 文件清理工具
 │
-├── data/                      # 📊 Data directory
-│   ├── input/                 # Input data (MP3 files)
-│   ├── processed/             # Processing data
-│   │   ├── wavs/             # WAV format files
-│   │   └── rttms/            # Speaker separation results
-│   └── output/               # Output data
-│       └── docs/             # Final processing results
+├── data/                      # 📊 数据目录
+│   ├── input/                 # 输入数据 (MP3文件)
+│   ├── processed/             # 处理中数据
+│   │   ├── wavs/             # WAV格式文件
+│   │   └── rttms/            # 说话人分离结果
+│   └── output/               # 输出数据
+│       └── docs/             # 最终处理结果
 │
-└── models/                   # 🤖 Model directory
-    └── senseVoice-small/    # Local SenseVoice model
+└── models/                   # 🤖 模型目录
+    └── senseVoice-small/    # 本地SenseVoice模型
 ```
 
-## ⚙️ Configuration System
+## ⚙️ 配置系统
 
-### Layered Configuration Architecture
+### 分层配置架构
 
-The system adopts layered configuration management, supporting flexible environment configuration and parameter tuning:
+系统采用分层配置管理，支持灵活的环境配置和参数调优：
 
 ```yaml
-# Configuration priority: Environment variables > Local config > Environment config > Default config
+# 配置优先级：环境变量 > 本地配置 > 环境配置 > 默认配置
 config/
-├── defaults/           # Basic default configuration
-├── environments/       # Environment-specific configuration (dev/test/prod)
-└── local/             # Local override configuration (not version controlled)
+├── defaults/           # 基础默认配置
+├── environments/       # 环境特定配置 (dev/test/prod)
+└── local/             # 本地覆盖配置 (不纳入版本控制)
 ```
 
-### Core Configuration Description
+### 核心配置说明
 
-#### System Configuration (`system.yaml`)
+#### 系统配置 (`system.yaml`)
 ```yaml
 device:
-  cuda_device: "cuda:1"     # GPU device setting
+  cuda_device: "cuda:1"     # GPU设备设置
 
 paths:
-  project_root: "."         # Project root path
-  sensevoice_model: "models/senseVoice-small"  # ASR model path
+  project_root: "."         # 项目根路径
+  sensevoice_model: "models/senseVoice-small"  # ASR模型路径
 ```
 
-#### Processing Configuration (`processing.yaml`)
+#### 处理配置 (`processing.yaml`)
 ```yaml
 batch:
-  enable_async_llm: true         # Enable asynchronous LLM processing
-  enable_knowledge_base: true    # Enable knowledge base integration
-  enable_gleaning: true          # Enable Gleaning multi-round cleaning
-  max_gleaning_rounds: 3         # Maximum cleaning rounds
+  enable_async_llm: true         # 启用异步LLM处理
+  enable_knowledge_base: true    # 启用知识库集成
+  enable_gleaning: true          # 启用Gleaning多轮清洗
+  max_gleaning_rounds: 3         # 最大清洗轮数
 ```
 
-#### Concurrency Configuration (`concurrency.yaml`)
+#### 并发配置 (`concurrency.yaml`)
 ```yaml
 async_llm:
-  max_concurrent_tasks: 16       # Maximum concurrent LLM tasks
-  max_retries: 2                 # Maximum retry count
+  max_concurrent_tasks: 16       # 最大并发LLM任务数
+  max_retries: 2                 # 最大重试次数
 ```
 
-## 🔄 Processing Pipeline Details
+## 🔄 处理流程详解
 
-### 1. Audio Preprocessing Stage
-- **Format Detection**: Automatically identify audio formats and convert to WAV uniformly
-- **Quality Verification**: Check audio integrity and sampling rate
-- **Path Management**: Standardize file naming and directory structure
+### 1. 音频预处理阶段
+- **格式检测**：自动识别音频格式，统一转换为WAV
+- **质量验证**：检查音频完整性和采样率
+- **路径管理**：规范化文件命名和目录结构
 
-### 2. Speaker Separation Stage
-- **Model Loading**: pyannote/speaker-diarization-3.1 deep learning model
-- **Separation Processing**: Generate RTTM format timestamp files
-- **GPU Acceleration**: Support CUDA acceleration, significantly improving processing speed
+### 2. 说话人分离阶段
+- **模型加载**：pyannote/speaker-diarization-3.1深度学习模型
+- **分离处理**：生成RTTM格式的时间戳文件
+- **GPU加速**：支持CUDA加速，显著提升处理速度
 
-### 3. Audio Segmentation Stage
-- **Precise Segmentation**: Millisecond-level segmentation based on RTTM timestamps
-- **File Naming**: `{sequence}_{speaker_ID}-{start_time}-{end_time}.wav`
-- **Batch Processing**: Support parallel segmentation of large-scale audio files
+### 3. 音频切分阶段
+- **精确切分**：基于RTTM时间戳进行毫秒级切分
+- **文件命名**：`{序号}_{说话人ID}-{起始时间}-{结束时间}.wav`
+- **批量处理**：支持大规模音频文件的并行切分
 
-### 4. Speech Recognition Stage
-- **Local Deployment**: SenseVoice-Small model local inference
-- **Multilingual Support**: Support Chinese-English mixed recognition
-- **High-Precision Output**: Recognition accuracy optimized for customer service scenarios
+### 4. 语音识别阶段
+- **本地部署**：SenseVoice-Small模型本地推理
+- **多语言支持**：支持中英文混合识别
+- **高精度输出**：针对客服场景优化的识别准确率
 
-### 5. LLM Cleaning Stage (Core Innovation)
-- **Gleaning Mechanism**: Multi-round iterative cleaning, each round optimized based on previous results
-- **Asynchronous Processing**: Support 16 concurrent tasks, dramatically improving processing efficiency
-- **Quality Control**: Intelligent assessment of cleaning effects, dynamic adjustment of cleaning strategies
-- **Professional Optimization**: Specialized cleaning strategies for medical device customer service dialogues
+### 5. LLM清洗阶段 (核心创新)
+- **Gleaning机制**：多轮迭代清洗，每轮基于上一轮结果优化
+- **异步处理**：支持16并发任务，大幅提升处理效率
+- **质量控制**：智能评估清洗效果，动态调整清洗策略
+- **专业优化**：针对医疗设备客服对话的专门清洗策略
 
-### 6. Q&A Extraction Stage
-- **Intelligent Recognition**: LLM-based automatic Q&A pair identification and extraction
-- **Structured Output**: Generate standard format Q&A pair data
-- **Quality Assessment**: Quality scoring and filtering of extracted Q&A pairs
+### 6. QA提取阶段
+- **智能识别**：基于LLM的问答对自动识别和提取
+- **结构化输出**：生成标准格式的QA对数据
+- **质量评估**：对提取的QA对进行质量评分和筛选
 
-### 7. Intelligent Compression Stage (Core Innovation)
-- **Similarity Verification**: LLM-based intelligent similarity judgment (93%+ confidence)
-- **Layered Compression**: Embedding pre-filtering + LLM precise judgment
-- **Forgetting Avoidance**: Incremental compression mechanism maintaining historical knowledge integrity
-- **Dual-Cache System**: Active/inactive buffer design optimizing compression performance
+### 7. 智能压缩阶段 (核心创新)
+- **相似度检验**：基于LLM的智能相似度判断 (93%+置信度)
+- **分层压缩**：Embedding预过滤 + LLM精确判断
+- **避免遗忘**：增量压缩机制，保持历史知识的完整性
+- **双缓存系统**：活跃/非活跃缓冲区设计，优化压缩性能
 
-## 🎯 Core Algorithms
+## 🎯 核心算法
 
-### Gleaning Multi-Round Cleaning Algorithm
+### Gleaning多轮清洗算法
 
 ```python
-# Multi-round iterative cleaning process
+# 多轮迭代清洗流程
 for round in range(max_rounds):
     cleaned_text = llm_clean(
         text=previous_result,
@@ -295,37 +293,37 @@ for round in range(max_rounds):
     previous_result = cleaned_text
 ```
 
-**Features**:
-- Each round optimized based on previous results
-- Dynamic quality assessment and early termination
-- Specialized cleaning strategies for customer service dialogue scenarios
+**特性**：
+- 每轮基于上一轮结果进行优化
+- 动态质量评估和提前终止
+- 专门针对客服对话场景的清洗策略
 
-### Intelligent Compression Algorithm
+### 智能压缩算法
 
 ```python
-# Three-stage compression process
+# 三阶段压缩流程
 def compress_qa_pairs(qa_pairs):
-    # Stage 1: Embedding pre-filtering
+    # 阶段1: Embedding预过滤
     candidates = embedding_prefilter(qa_pairs, threshold=0.85)
 
-    # Stage 2: LLM precise similarity judgment
+    # 阶段2: LLM精确相似度判断
     similar_groups = llm_similarity_check(candidates)
 
-    # Stage 3: Intelligent merging
+    # 阶段3: 智能合并
     compressed_pairs = llm_merge_similar(similar_groups)
 
     return compressed_pairs
 ```
 
-**Features**:
-- 93%+ similarity detection confidence
-- 40%+ compression rate improvement (compared to traditional algorithms)
-- Avoiding catastrophic forgetting in dynamic knowledge base expansion
+**特性**：
+- 93%+的相似度检测置信度
+- 40%+压缩率提升 (相比传统算法)
+- 避免知识库动态扩展中的灾难性遗忘
 
-### Asynchronous Concurrency Control
+### 异步并发控制
 
 ```python
-# Asynchronous LLM processor
+# 异步LLM处理器
 class AsyncLLMProcessor:
     def __init__(self, max_concurrent=16):
         self.executor = ThreadPoolExecutor(max_workers=max_concurrent)
@@ -337,202 +335,202 @@ class AsyncLLMProcessor:
         return results
 ```
 
-**Features**:
-- Support for arbitrarily configured maximum concurrent LLM tasks
-- Intelligent task scheduling and resource management
-- Automatic error recovery and retry mechanisms
+**特性**：
+- 任意配置的最高并发LLM任务
+- 智能任务调度和资源管理
+- 自动错误恢复和重试机制
 
-## 🔧 Advanced Configuration
+## 🔧 高级配置
 
-### Environment Configuration Switching
+### 环境配置切换
 
 ```bash
-# Development environment
+# 开发环境
 export APP_ENV=development
 
-# Testing environment
+# 测试环境
 export APP_ENV=testing
 
-# Production environment
+# 生产环境
 export APP_ENV=production
 ```
 
-### Performance Optimization Configuration
+### 性能优化配置
 
 ```yaml
 # config/local/performance.yaml
 system:
   device:
-    cuda_device: "cuda:0"  # Specify GPU device
+    cuda_device: "cuda:0"  # 指定GPU设备
 
 processing:
   batch:
-    max_concurrent_tasks: 32  # Increase concurrency (high-end GPU)
+    max_concurrent_tasks: 32  # 增加并发数 (高端GPU)
 
 algorithms:
   similarity:
-    embedding_threshold: 0.90  # Increase pre-filtering threshold
+    embedding_threshold: 0.90  # 提高预过滤阈值
 ```
 
-### Business Scenario Customization
+### 业务场景定制
 
 ```yaml
 # config/local/business.yaml
 business:
-  domain: "medical_device"      # Business domain
-  terminology:                 # Professional terminology
+  domain: "medical_device"      # 业务领域
+  terminology:                 # 专业术语库
     - "血糖仪"
     - "无创检测"
     - "校准"
 ```
 
-## 🚀 Deployment Guide
+## 🚀 部署指南
 
-### Production Environment Deployment
+### 生产环境部署
 
-1. **Environment Configuration**
+1. **环境配置**
 ```bash
 export APP_ENV=production
 export APP_LOG_LEVEL=INFO
 export APP_CUDA_DEVICE=cuda:0
 ```
 
-2. **Resource Optimization**
+2. **资源优化**
 ```bash
-# Ensure sufficient GPU memory
+# 确保充足的GPU内存
 nvidia-smi
 
-# Adjust system parameters
-ulimit -n 65536  # Increase file descriptor limit
+# 调整系统参数
+ulimit -n 65536  # 增加文件描述符限制
 ```
 
-3. **Monitoring Configuration**
+3. **监控配置**
 ```bash
-# Monitor GPU usage
+# 监控GPU使用
 nvidia-smi -l 1
 
-# Monitor processing logs
+# 监控处理日志
 tail -f logs/process.log
 ```
 
-## 🔍 Troubleshooting
+## 🔍 故障排除
 
-### Common Issues
+### 常见问题
 
-**1. CUDA Out of Memory**
+**1. CUDA内存不足**
 ```
-Solutions:
-- Reduce concurrent task count: max_concurrent_tasks: 8
-- Use CPU mode: cuda_device: "cpu"
-- Increase GPU memory or use higher-end graphics card
-```
-
-**2. API Call Failure**
-```
-Solutions:
-- Check API key configuration in .env file
-- Verify network connection and API service status
-- Check detailed error logs in logs/ directory
+解决方案：
+- 降低并发任务数: max_concurrent_tasks: 8
+- 使用CPU模式: cuda_device: "cpu"
+- 增加GPU显存或使用更高端显卡
 ```
 
-**3. Model Download Failure**
+**2. API调用失败**
 ```
-Solutions:
-- Ensure normal network connection
-- Configure correct HUGGINGFACE_TOKEN
-- Manually download model to models/ directory
-```
-
-**4. Unsupported Audio File Format**
-```
-Solutions:
-- Ensure audio files are in MP3 or WAV format
-- Check file integrity and encoding format
-- Use ffmpeg to preprocess audio files
+解决方案：
+- 检查 .env 文件中的API密钥配置
+- 验证网络连接和API服务状态
+- 查看 logs/ 目录下的详细错误日志
 ```
 
-### Debug Mode
+**3. 模型下载失败**
+```
+解决方案：
+- 确保网络连接正常
+- 配置正确的 HUGGINGFACE_TOKEN
+- 手动下载模型到 models/ 目录
+```
+
+**4. 音频文件格式不支持**
+```
+解决方案：
+- 确保音频文件为 MP3 或 WAV 格式
+- 检查文件完整性和编码格式
+- 使用 ffmpeg 预处理音频文件
+```
+
+### 调试模式
 
 ```bash
-# Enable detailed logging
+# 启用详细日志
 export APP_LOG_LEVEL=DEBUG
 
-# View configuration diagnostics
+# 查看配置诊断
 python -c "from config import diagnose_config; diagnose_config()"
 
-# Module testing
-python -m src.core.asr          # Test ASR module
-python -m src.core.diarization  # Test speaker separation
+# 分模块测试
+python -m src.core.asr          # 测试ASR模块
+python -m src.core.diarization  # 测试说话人分离
 ```
 
-## 🤝 Contribution Guide
+## 🤝 贡献指南
 
-### Development Environment Setup
+### 开发环境设置
 
 ```bash
-# 1. Fork the project and clone
+# 1. Fork项目并克隆
 git clone <your-fork-url>
 cd end2end_autio2kg
 
-# 2. Create development branch
+# 2. 创建开发分支
 git checkout -b feature/your-feature
 
-# 3. Install development dependencies
+# 3. 安装开发依赖
 pip install -r requirements.txt
 
-# 4. Run tests
-python -m pytest tests/  # If tests exist
+# 4. 运行测试
+python -m pytest tests/  # 如果存在测试
 ```
 
-### Code Standards
+### 代码规范
 
-- **Configuration-Driven**: All hardcoded values should be managed through the configuration system
-- **Type Safety**: Use dataclass and type annotations
-- **Error Handling**: Implement graceful error handling and recovery mechanisms
-- **Logging**: Use structured logging for key operations
-- **Modular Design**: Maintain decoupling and independence between modules
+- **配置驱动**：所有硬编码值都应通过配置系统管理
+- **类型安全**：使用dataclass和类型注解
+- **错误处理**：实现优雅的错误处理和恢复机制
+- **日志记录**：使用结构化日志记录关键操作
+- **模块化设计**：保持模块间的解耦和独立性
 
-### Commit Standards
+### 提交规范
 
 ```bash
-# Commit message format
-git commit -m "feat: Add custom ASR model support"
-git commit -m "fix: Fix memory leak in concurrent processing"
-git commit -m "docs: Update deployment guide documentation"
+# 提交信息格式
+git commit -m "feat: 添加自定义ASR模型支持"
+git commit -m "fix: 修复并发处理时的内存泄漏问题"
+git commit -m "docs: 更新部署指南文档"
 ```
 
-## 📄 License
+## 📄 许可证
 
-This project adopts the [MIT License](LICENSE) open source protocol.
+本项目采用 [MIT License](LICENSE) 开源协议。
 
-## 👥 Author Team
+## 👥 作者团队
 
-**DezSmart Medical Technology Co., Ltd. Technical Team**
+**德至尚医疗科技有限公司技术团队**
 
-- 📧 **Contact Email**: ericsenyao@163.com
-- 🏢 **Company**: DezSmart Medical Technology Co., Ltd.
+- 📧 **联系邮箱**: ericsenyao@163.com
+- 🏢 **公司**: 德至尚医疗科技有限公司
 
-## 🙏 Acknowledgments
+## 🙏 致谢
 
-Thanks to the following open source projects and technical communities for their support:
+感谢以下开源项目和技术社区的支持：
 
-- [pyannote.audio](https://github.com/pyannote/pyannote-audio) - Speaker separation technology
-- [ModelScope](https://modelscope.cn/) - SenseVoice speech recognition model
-- [Alibaba Cloud Tongyi Qianwen](https://dashscope.aliyuncs.com/) - LLM data processing service
-- [PyTorch](https://pytorch.org/) - Deep learning framework
+- [pyannote.audio](https://github.com/pyannote/pyannote-audio) - 说话人分离技术
+- [ModelScope](https://modelscope.cn/) - SenseVoice语音识别模型
+- [阿里云通义千问](https://dashscope.aliyuncs.com/) - LLM数据处理服务
+- [PyTorch](https://pytorch.org/) - 深度学习框架
 
-## 📞 Technical Support
+## 📞 技术支持
 
-For technical support or business cooperation, please contact us through:
+如需技术支持或商业合作，请通过以下方式联系：
 
-- **Technical Issues**: Submit on GitHub Issues
-- **Business Cooperation**: ericsenyao@163.com
-- **Documentation Contribution**: Welcome to submit PRs for documentation improvements
+- **技术问题**: 在GitHub Issues中提出
+- **商业合作**: ericsenyao@163.com
+- **文档贡献**: 欢迎提交PR改进文档
 
 ---
 
 <div align="center">
 
-**⭐ If this project helps you, please give us a Star! ⭐**
+**⭐ 如果这个项目对您有帮助，请给我们一个Star！⭐**
 
 </div>
