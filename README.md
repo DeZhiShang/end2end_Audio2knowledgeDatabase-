@@ -28,22 +28,26 @@
 
 ### 端到端处理流程
 
-```
-原始MP3录音
-    ↓ [音频格式转换]
-WAV标准格式音频
-    ↓ [说话人分离 - pyannote-3.1]
-RTTM时间戳文件
-    ↓ [音频片段切分 - torchaudio]
-按说话人分割的音频片段
-    ↓ [语音识别 - SenseVoice-Small]
-原始ASR文本
-    ↓ [多轮LLM清洗 - qwen-plus]
-高质量对话语料
-    ↓ [问答对提取]
-结构化QA对
-    ↓ [智能压缩系统]
-高质量知识库
+```mermaid
+graph TB
+    Start([原始MP3录音]) -->|音频预处理| Conv[音频格式转换<br/>MP3→WAV]
+    Conv -->|标准化音频| Diar[说话人分离<br/>pyannote-3.1]
+    Diar -->|RTTM时间戳| Seg[音频片段切分<br/>torchaudio]
+    Seg -->|按说话人分割| ASR[语音识别<br/>SenseVoice-Small]
+    ASR -->|原始ASR文本| Clean[多轮LLM清洗<br/>Gleaning机制]
+    Clean -->|高质量对话| QA[问答对提取<br/>LLM驱动]
+    QA -->|结构化QA对| Compress[智能压缩系统<br/>双缓存（压缩与写入互不阻塞）+三层次高效压缩]
+    Compress --> KB[(高质量知识库)]
+
+    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Conv fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Diar fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style Seg fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    style ASR fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Clean fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style QA fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    style Compress fill:#e8eaf6,stroke:#1a237e,stroke-width:3px
+    style KB fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
 ```
 
 ### 核心技术栈
@@ -268,10 +272,81 @@ async_llm:
 - **质量评估**：对提取的QA对进行质量评分和筛选
 
 ### 7. 智能压缩阶段 (核心创新)
-- **相似度检验**：基于LLM的智能相似度判断 (93%+置信度)
-- **分层压缩**：Embedding预过滤 + LLM精确判断
-- **避免遗忘**：增量压缩机制，保持历史知识的完整性
-- **双缓存系统**：活跃/非活跃缓冲区设计，优化压缩性能
+
+#### 🎯 双缓存系统架构
+```mermaid
+graph LR
+    subgraph 双缓存知识库
+        BufferA[Buffer A<br/>活跃缓冲区]
+        BufferB[Buffer B<br/>非活跃缓冲区]
+        Snapshot[快照系统<br/>Snapshot Offset]
+    end
+
+    NewData[新问答对] -->|持续追加| BufferA
+    BufferA -.->|创建快照| Snapshot
+    Snapshot -.->|压缩处理| CompactEngine[压缩引擎]
+    CompactEngine -->|切换+尾部同步| BufferB
+    BufferA <-.->|轮换切换| BufferB
+    BufferB -->|保存文件| KBFile[(知识库文件)]
+
+    style BufferA fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style BufferB fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style Snapshot fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray: 5 5
+    style CompactEngine fill:#e8eaf6,stroke:#3f51b5,stroke-width:3px
+    style NewData fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style KBFile fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+```
+
+#### ⚙️ 三阶段智能压缩策略
+```mermaid
+graph TB
+    Input[问答对列表] --> Stage1[阶段1: Embedding预筛选]
+
+    subgraph Stage1[🔍 阶段1: Embedding预筛选]
+        E1[并行获取Embedding<br/>qwen3-embedding-8b] --> E2[HDBSCAN密度聚类<br/>自动发现相似簇]
+        E2 --> E3[生成候选批次<br/>减少90%比对量]
+    end
+
+    Stage1 -->|候选相似组| Stage2[阶段2: LLM精确判断]
+
+    subgraph Stage2[🎯 阶段2: LLM精确判断]
+        L1[批量LLM分析<br/>qwen-plus-latest] --> L2[语义相似度检验<br/>93%+置信度]
+        L2 --> L3[相似组标记<br/>GROUP标签]
+    end
+
+    Stage2 -->|确认相似组| Stage3[阶段3: 智能合并]
+
+    subgraph Stage3[✨ 阶段3: 智能合并]
+        M1[LLM融合问答对<br/>保留完整信息] --> M2[生成合并QA<br/>高质量输出]
+        M2 --> M3[更新元数据<br/>追踪合并历史]
+    end
+
+    Stage3 --> Output[压缩后问答对<br/>40%+压缩率]
+
+    style Input fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Stage1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    style Stage2 fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
+    style Stage3 fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
+    style Output fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+
+    style E1 fill:#e8f5e9,stroke:#43a047
+    style E2 fill:#e8f5e9,stroke:#43a047
+    style E3 fill:#e8f5e9,stroke:#43a047
+
+    style L1 fill:#fff3e0,stroke:#fb8c00
+    style L2 fill:#fff3e0,stroke:#fb8c00
+    style L3 fill:#fff3e0,stroke:#fb8c00
+
+    style M1 fill:#f3e5f5,stroke:#8e24aa
+    style M2 fill:#f3e5f5,stroke:#8e24aa
+    style M3 fill:#f3e5f5,stroke:#8e24aa
+```
+
+**核心特性**:
+- **智能预筛选**: Embedding+HDBSCAN聚类，减少90%无效比对
+- **LLM精确判断**: 93%+相似度检测置信度
+- **避免遗忘**: 尾部增量同步机制，保持知识完整性
+- **双缓存设计**: 活跃/非活跃缓冲区轮换，零阻塞写入
 
 ## 🎯 核心算法
 
